@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backrooms Zone -- Door Registry</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: #c0c0c0;
+      color: #000000;
+      font-family: "Arial", "Helvetica", sans-serif;
+      font-size: 13px;
+    }
+
+    /* ---- title bar ---- */
+    #titlebar {
+      background: #000080;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 10px;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    #titlebar .title { letter-spacing: 0.05em; }
+    #titlebar .btns  { display: flex; gap: 3px; }
+    #titlebar .btn {
+      width: 16px; height: 14px;
+      background: #c0c0c0;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+      font-size: 8px;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      font-family: "Arial", sans-serif;
+      font-weight: bold;
+    }
+
+    /* ---- menu bar ---- */
+    #menubar {
+      background: #c0c0c0;
+      border-bottom: 1px solid #808080;
+      padding: 2px 4px;
+      font-size: 12px;
+      display: flex;
+      gap: 0;
+      position: relative;
+      z-index: 100;
+    }
+
+    .menu-item {
+      position: relative;
+    }
+    .menu-item > .menu-label {
+      display: block;
+      padding: 2px 8px;
+      cursor: default;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .menu-item > .menu-label u { text-decoration: underline; }
+    .menu-item > .menu-label:hover,
+    .menu-item.open > .menu-label {
+      background: #000080;
+      color: #fff;
+    }
+
+    /* dropdown panel */
+    .menu-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      min-width: 180px;
+      background: #c0c0c0;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #404040;
+      border-bottom: 2px solid #404040;
+      box-shadow: 2px 2px 0 #000000;
+      z-index: 200;
+      padding: 2px 0;
+    }
+    .menu-item.open > .menu-dropdown { display: block; }
+
+    .menu-dropdown .entry {
+      display: flex;
+      align-items: center;
+      padding: 3px 20px 3px 24px;
+      cursor: default;
+      white-space: nowrap;
+      font-size: 12px;
+      color: #000;
+      user-select: none;
+      position: relative;
+    }
+    .menu-dropdown .entry:hover {
+      background: #000080;
+      color: #fff;
+    }
+    .menu-dropdown .entry.disabled {
+      color: #808080;
+      cursor: default;
+    }
+    .menu-dropdown .entry.disabled:hover {
+      background: transparent;
+      color: #808080;
+    }
+    .menu-dropdown .entry .shortcut {
+      margin-left: auto;
+      padding-left: 24px;
+      color: inherit;
+      opacity: 0.7;
+      font-size: 11px;
+    }
+    .menu-dropdown .entry a {
+      color: inherit;
+      text-decoration: none;
+      display: contents;
+    }
+    .menu-sep {
+      border: none;
+      border-top: 1px solid #808080;
+      border-bottom: 1px solid #ffffff;
+      margin: 3px 2px;
+    }
+
+    /* ---- address bar ---- */
+    #addressbar {
+      background: #c0c0c0;
+      border-bottom: 2px solid #808080;
+      padding: 3px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+    #addressbar label { white-space: nowrap; }
+    #addressbar input {
+      flex: 1;
+      background: #ffffff;
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      padding: 1px 4px;
+      font-size: 12px;
+      font-family: "Arial", sans-serif;
+      outline: none;
+    }
+
+    /* ---- marquee banner ---- */
+    .marquee-wrap {
+      background: #000080;
+      color: #ffff00;
+      font-family: "VT323", monospace;
+      font-size: 16px;
+      padding: 3px 0;
+      overflow: hidden;
+    }
+
+    /* ---- main window ---- */
+    #window {
+      margin: 10px auto;
+      max-width: 620px;
+      background: #ffffff;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+    }
+    #content {
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      padding: 18px 20px;
+    }
+
+    /* ---- typography ---- */
+    h1 {
+      font-family: "Press Start 2P", monospace;
+      font-size: 14px;
+      color: #000080;
+      margin-bottom: 4px;
+      line-height: 1.6;
+    }
+
+    p { line-height: 1.6; margin-bottom: 8px; }
+
+    a          { color: #0000ee; }
+    a:visited  { color: #551a8b; }
+    a:hover    { color: #0000cc; }
+
+    hr {
+      border: none;
+      border-top: 2px solid #808080;
+      border-bottom: 2px solid #ffffff;
+      margin: 14px 0;
+    }
+
+    /* ---- token inset ---- */
+    .inset {
+      background: #c0c0c0;
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      padding: 8px 10px;
+      font-family: "VT323", monospace;
+      font-size: 17px;
+      line-height: 1.5;
+    }
+    .inset .label {
+      font-family: "Press Start 2P", monospace;
+      font-size: 7px;
+      color: #000080;
+      margin-bottom: 4px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .inset .value { word-break: break-all; }
+    .inset .hint  { font-size: 14px; color: #444; margin-top: 4px; }
+
+    /* ---- THE DOOR BUTTON ---- */
+    #door-section {
+      text-align: center;
+      padding: 24px 0 16px;
+    }
+
+    #enter-btn {
+      font-family: "Press Start 2P", monospace;
+      font-size: 13px;
+      color: #000000;
+      background: #c0c0c0;
+      border-top: 4px solid #ffffff;
+      border-left: 4px solid #ffffff;
+      border-right: 4px solid #808080;
+      border-bottom: 4px solid #808080;
+      padding: 18px 32px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      line-height: 1.8;
+      outline: none;
+      transition: none;
+    }
+    #enter-btn:active,
+    #enter-btn.pressed {
+      border-top: 4px solid #808080;
+      border-left: 4px solid #808080;
+      border-right: 4px solid #ffffff;
+      border-bottom: 4px solid #ffffff;
+      padding: 20px 30px 16px 34px;
+    }
+    #enter-btn:focus { outline: 1px dotted #000; outline-offset: -4px; }
+
+    #door-status {
+      font-family: "VT323", monospace;
+      font-size: 16px;
+      color: #444;
+      margin-top: 10px;
+      min-height: 20px;
+    }
+    #door-status.err { color: #8b0000; }
+
+    /* ---- counter ---- */
+    .counter {
+      font-family: "VT323", monospace;
+      font-size: 22px;
+      letter-spacing: 3px;
+      background: #000;
+      color: #ff0000;
+      padding: 2px 8px;
+      display: inline-block;
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+    }
+
+    .center { text-align: center; }
+    .small  { font-size: 11px; color: #444; }
+
+    /* ---- status bar ---- */
+    #statusbar {
+      background: #c0c0c0;
+      border-top: 2px solid #808080;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #000;
+      display: flex;
+      gap: 4px;
+    }
+    #statusbar .cell {
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      padding: 1px 8px;
+    }
+    #statusbar .cell.wide { flex: 1; }
+  </style>
+</head>
+<body>
+
+<!-- title bar -->
+<div id="titlebar">
+  <span class="title">&#x1F5A5; Backrooms Zone -- Door Registry -- Netscape Navigator</span>
+  <span class="btns">
+    <span class="btn">_</span>
+    <span class="btn">&#9633;</span>
+    <span class="btn">&#x2715;</span>
+  </span>
+</div>
+
+<!-- menu bar -->
+<div id="menubar">
+
+  <div class="menu-item" data-menu="file">
+    <span class="menu-label"><u>F</u>ile</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">New Window <span class="shortcut">Ctrl+N</span></div>
+      <div class="entry disabled">Open Location... <span class="shortcut">Ctrl+L</span></div>
+      <div class="entry disabled">Open File... <span class="shortcut">Ctrl+O</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Save Page As... <span class="shortcut">Ctrl+S</span></div>
+      <div class="entry disabled">Send Page...</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Print... <span class="shortcut">Ctrl+P</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Close <span class="shortcut">Ctrl+W</span></div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="edit">
+    <span class="menu-label"><u>E</u>dit</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Undo <span class="shortcut">Ctrl+Z</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Cut <span class="shortcut">Ctrl+X</span></div>
+      <div class="entry disabled">Copy <span class="shortcut">Ctrl+C</span></div>
+      <div class="entry disabled">Paste <span class="shortcut">Ctrl+V</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Select All <span class="shortcut">Ctrl+A</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Find in Page... <span class="shortcut">Ctrl+F</span></div>
+      <div class="entry disabled">Find Again <span class="shortcut">Ctrl+G</span></div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="view">
+    <span class="menu-label"><u>V</u>iew</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Reload <span class="shortcut">Ctrl+R</span></div>
+      <div class="entry disabled">Stop <span class="shortcut">Esc</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">&#10003;&nbsp; Toolbar</div>
+      <div class="entry disabled">&#10003;&nbsp; Status Bar</div>
+      <div class="entry disabled">&#10003;&nbsp; Location Bar</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Page Source <span class="shortcut">Ctrl+U</span></div>
+      <div class="entry disabled">Page Info <span class="shortcut">Ctrl+I</span></div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="go">
+    <span class="menu-label"><u>G</u>o</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Back <span class="shortcut">Alt+&#8592;</span></div>
+      <div class="entry disabled">Forward <span class="shortcut">Alt+&#8594;</span></div>
+      <div class="entry disabled">Home</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Search the Web...</div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="rooms">
+    <span class="menu-label"><u>R</u>ooms</span>
+    <div class="menu-dropdown">
+      <div class="entry"><a href="/found-a-room.html">Found a Room...</a></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">My Rooms</div>
+      <div class="entry disabled">Browse All Rooms</div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="help">
+    <span class="menu-label"><u>H</u>elp</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Help Contents</div>
+      <div class="entry disabled">Release Notes</div>
+      <div class="entry disabled">How to Get Support</div>
+      <hr class="menu-sep" />
+      <div class="entry"><a href="https://github.com/jason-sperske/backrooms.zone" target="_blank">About Backrooms Zone...</a></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- address bar -->
+<div id="addressbar">
+  <label>Location:</label>
+  <input type="text" value="http://backrooms.zone/" readonly />
+</div>
+
+<!-- marquee -->
+<div class="marquee-wrap">
+  <marquee behavior="scroll" direction="left" scrollamount="3">
+    &nbsp;&nbsp;&nbsp;*** WELCOME TO BACKROOMS ZONE ***&nbsp;&nbsp;&nbsp;
+    You have entered. There is no exit. Only more doors.&nbsp;&nbsp;&nbsp;
+    Best viewed in Netscape Navigator 3.0 at 640x480&nbsp;&nbsp;&nbsp;
+    *** DO NOT CLOSE THIS WINDOW ***&nbsp;&nbsp;&nbsp;
+  </marquee>
+</div>
+
+<!-- main window -->
+<div id="window">
+  <div id="content">
+
+    <h1>BACKROOMS.ZONE</h1>
+    <p class="small">Door Registry v1.0 &mdash; Est. 1996</p>
+    <hr />
+
+    <p>
+      Welcome, wanderer. You have found the door registry.
+      Games in the Backrooms register their exits here.
+      Your path is unique &mdash; and permanent.
+      Once a door leads somewhere, it always will.
+    </p>
+
+    <hr />
+
+    <div class="inset">
+      <div class="label">Your Explorer Token</div>
+      <div class="value" id="token-display">please wait...</div>
+      <div class="hint">Unique to this machine. Do not share it.</div>
+    </div>
+
+    <hr />
+
+    <!-- THE BUTTON -->
+    <div id="door-section">
+      <button id="enter-btn" onclick="enterDoor()">
+        [ ENTER DOOR ]
+      </button>
+      <div id="door-status"></div>
+    </div>
+
+    <hr />
+
+    <div class="center">
+      <p class="small">You are visitor number</p>
+      <div class="counter" id="visit-counter">0000000</div>
+      <br /><br />
+      <p class="small">
+        &copy; 1996&ndash;<span id="yr">1996</span> Backrooms Zone &mdash;
+        <a href="/api/docs">API docs</a> &mdash;
+        640x480 recommended
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<!-- status bar -->
+<div id="statusbar">
+  <div class="cell wide" id="status-msg">Document: Done</div>
+  <div class="cell" id="status-token">&nbsp;</div>
+</div>
+
+<script>
+  (function () {
+    const KEY       = "bz_token";
+    const VISIT_KEY = "bz_visits";
+    const SOURCE    = window.location.href.split("?")[0];
+
+    // ---- token ----
+    function generateToken() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
+
+    let token = localStorage.getItem(KEY);
+    if (!token) {
+      token = generateToken();
+      localStorage.setItem(KEY, token);
+    }
+    document.getElementById("token-display").textContent = token;
+    document.getElementById("status-token").textContent  = "ID: " + token.slice(0, 8) + "...";
+
+    // ---- visit counter (local vanity) ----
+    let visits = parseInt(localStorage.getItem(VISIT_KEY) || "0", 10) + 1;
+    localStorage.setItem(VISIT_KEY, visits);
+    document.getElementById("visit-counter").textContent = String(visits).padStart(7, "0");
+    document.getElementById("yr").textContent = new Date().getFullYear();
+
+    // ---- door button ----
+    window.enterDoor = function () {
+      const btn    = document.getElementById("enter-btn");
+      const status = document.getElementById("door-status");
+      const msgBar = document.getElementById("status-msg");
+
+      btn.classList.add("pressed");
+      btn.disabled = true;
+      status.className = "";
+      status.textContent = "Checking doors...";
+      msgBar.textContent = "Connecting...";
+
+      fetch("/doors?token=" + encodeURIComponent(token))
+        .then(r => r.json())
+        .then(doors => {
+          if (doors.length === 0) {
+            btn.classList.remove("pressed");
+            btn.disabled = false;
+            status.className = "err";
+            status.textContent = "No doors seem to be open right now.";
+            msgBar.textContent = "Document: Done";
+            alert("No doors seem to be open right now.\n\nCheck back later, wanderer.");
+            return;
+          }
+          status.textContent = "Opening door...";
+          msgBar.textContent = "Loading...";
+          window.location.href = "/door?token=" + encodeURIComponent(token)
+            + "&source=" + encodeURIComponent(SOURCE);
+        })
+        .catch(() => {
+          btn.classList.remove("pressed");
+          btn.disabled = false;
+          status.className = "err";
+          status.textContent = "Error: could not reach the registry.";
+          msgBar.textContent = "Error: connection failed";
+        });
+    };
+  })();
+
+  // ---- dropdown menus ----
+  (function () {
+    const items = Array.from(document.querySelectorAll(".menu-item"));
+
+    function closeAll() {
+      items.forEach(i => i.classList.remove("open"));
+    }
+
+    items.forEach(item => {
+      const label = item.querySelector(".menu-label");
+
+      label.addEventListener("mousedown", e => {
+        e.preventDefault();
+        const wasOpen = item.classList.contains("open");
+        closeAll();
+        if (!wasOpen) item.classList.add("open");
+      });
+
+      // While a menu is open, hovering another label switches to it
+      label.addEventListener("mouseenter", () => {
+        if (items.some(i => i.classList.contains("open"))) {
+          closeAll();
+          item.classList.add("open");
+        }
+      });
+
+      // Clicks on disabled entries do nothing; eat the event cleanly
+      item.querySelectorAll(".entry.disabled").forEach(entry => {
+        entry.addEventListener("mousedown", e => e.preventDefault());
+        entry.addEventListener("click",     e => e.stopPropagation());
+      });
+
+      // Real entries close the menu after click
+      item.querySelectorAll(".entry:not(.disabled)").forEach(entry => {
+        entry.addEventListener("click", () => closeAll());
+      });
+    });
+
+    // Click outside closes everything
+    document.addEventListener("mousedown", e => {
+      if (!e.target.closest(".menu-item")) closeAll();
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Backrooms Zone -- Opening Door...</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000080;
+      color: #c0c0c0;
+      font-family: "VT323", monospace;
+      font-size: 20px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- title bar ---- */
+    #titlebar {
+      background: #c0c0c0;
+      color: #000;
+      font-family: "Press Start 2P", monospace;
+      font-size: 9px;
+      padding: 3px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+      border-bottom: 2px solid #808080;
+    }
+    #titlebar .btns { display: flex; gap: 3px; }
+    #titlebar .btn {
+      width: 16px; height: 14px;
+      background: #c0c0c0;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+      font-size: 8px; color: #000;
+      display: flex; align-items: center; justify-content: center;
+      cursor: default; font-weight: bold;
+    }
+
+    /* ---- main area ---- */
+    #stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    #stage h1 {
+      font-family: "Press Start 2P", monospace;
+      font-size: 11px;
+      color: #ffff00;
+      letter-spacing: 0.12em;
+      margin-bottom: 28px;
+      line-height: 2;
+    }
+
+    /* progress bar */
+    #bar-outer {
+      width: 340px;
+      max-width: 90vw;
+      height: 26px;
+      background: #000040;
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    #bar-inner {
+      height: 100%;
+      width: 0%;
+      background: repeating-linear-gradient(
+        90deg,
+        #c0c0c0 0px, #c0c0c0 16px,
+        #000080 16px, #000080 18px
+      );
+      transition: width 0.3s linear;
+    }
+
+    #status-line {
+      font-size: 18px;
+      color: #c0c0c0;
+      min-height: 24px;
+      margin-bottom: 10px;
+    }
+
+    #error-box {
+      display: none;
+      margin-top: 20px;
+      background: #c0c0c0;
+      color: #8b0000;
+      font-family: "Press Start 2P", monospace;
+      font-size: 8px;
+      line-height: 2;
+      padding: 14px 18px;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+      max-width: 400px;
+      text-align: left;
+    }
+    #error-box .err-title {
+      color: #000080;
+      margin-bottom: 8px;
+    }
+    #error-box a {
+      color: #000080;
+    }
+
+    /* ---- status bar ---- */
+    #statusbar {
+      background: #c0c0c0;
+      border-top: 2px solid #808080;
+      padding: 2px 8px;
+      font-size: 13px;
+      color: #000;
+      display: flex;
+      gap: 4px;
+      font-family: "Arial", sans-serif;
+    }
+    #statusbar .cell {
+      border-top: 2px solid #808080;
+      border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff;
+      border-bottom: 2px solid #ffffff;
+      padding: 1px 8px;
+    }
+    #statusbar .cell.wide { flex: 1; }
+  </style>
+</head>
+<body>
+
+<div id="titlebar">
+  <span>&#x1F5A5; Opening Door... -- Backrooms Zone</span>
+  <span class="btns">
+    <span class="btn">_</span>
+    <span class="btn">&#9633;</span>
+    <span class="btn">&#x2715;</span>
+  </span>
+</div>
+
+<div id="stage">
+  <h1>BACKROOMS ZONE<br/>DOOR REGISTRY</h1>
+
+  <div id="bar-outer"><div id="bar-inner"></div></div>
+  <div id="status-line">Initializing...</div>
+
+  <div id="error-box">
+    <div class="err-title">ERROR</div>
+    <div id="error-msg">An unknown error occurred.</div>
+    <br/>
+    <a href="/">Return to registry</a>
+  </div>
+</div>
+
+<div id="statusbar">
+  <div class="cell wide" id="sb-msg">Connecting to door registry...</div>
+  <div class="cell" id="sb-token">&nbsp;</div>
+</div>
+
+<script>
+(function () {
+  const TOKEN_KEY = "bz_token";
+  const STEPS = [
+    [10,  "Reading explorer token..."],
+    [25,  "Locating door in registry..."],
+    [50,  "Resolving destination..."],
+    [75,  "Calculating return coordinates..."],
+    [90,  "Opening portal..."],
+    [100, "Stepping through..."],
+  ];
+
+  const bar    = document.getElementById("bar-inner");
+  const status = document.getElementById("status-line");
+  const sbMsg  = document.getElementById("sb-msg");
+  const sbTok  = document.getElementById("sb-token");
+
+  function setProgress(pct, msg) {
+    bar.style.width = pct + "%";
+    status.textContent = msg;
+    sbMsg.textContent  = msg;
+  }
+
+  function showError(msg) {
+    document.getElementById("error-box").style.display = "block";
+    document.getElementById("error-msg").textContent   = msg;
+    status.textContent = "Error.";
+    sbMsg.textContent  = "Error: " + msg;
+    bar.style.background = "#8b0000";
+  }
+
+  // ---- read params ----
+  const params = new URLSearchParams(window.location.search);
+  const source = params.get("source");
+
+  if (!source) {
+    setProgress(0, "");
+    showError("No source URL provided. Is this link from a registered game?");
+    return;
+  }
+
+  // ---- token ----
+  function generateToken() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  }
+  let token = localStorage.getItem(TOKEN_KEY);
+  if (!token) { token = generateToken(); localStorage.setItem(TOKEN_KEY, token); }
+  sbTok.textContent = "ID: " + token.slice(0, 8) + "...";
+
+  // ---- animate through steps, then resolve ----
+  let stepIdx = 0;
+  function runNextStep() {
+    if (stepIdx >= STEPS.length - 1) {
+      resolve();
+      return;
+    }
+    const [pct, msg] = STEPS[stepIdx++];
+    setProgress(pct, msg);
+    setTimeout(runNextStep, 260 + Math.random() * 180);
+  }
+
+  function resolve() {
+    setProgress(75, "Resolving destination...");
+
+    const body = {
+      token,
+      source,
+      x:  parseFloat(params.get("x"))  || null,
+      y:  parseFloat(params.get("y"))  || null,
+      z:  parseFloat(params.get("z"))  || null,
+      nx: parseFloat(params.get("nx")) || null,
+      ny: parseFloat(params.get("ny")) || null,
+      nz: parseFloat(params.get("nz")) || null,
+    };
+
+    fetch("/door/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || "Registry error.");
+        return data;
+      })
+      .then(data => {
+        setProgress(90, "Opening portal...");
+        setTimeout(() => {
+          setProgress(100, "Stepping through...");
+
+          let dest = data.destination;
+
+          // Append return-position params so the destination game can
+          // place the player back where they left from on the other side.
+          if (data.return_position) {
+            const p  = data.return_position;
+            const sp = new URLSearchParams();
+            sp.set("bz_x",  p.x);
+            sp.set("bz_y",  p.y);
+            sp.set("bz_z",  p.z);
+            sp.set("bz_nx", p.nx);
+            sp.set("bz_ny", p.ny);
+            sp.set("bz_nz", p.nz);
+            dest += (dest.includes("?") ? "&" : "?") + sp.toString();
+          }
+
+          setTimeout(() => { window.location.href = dest; }, 300);
+        }, 350);
+      })
+      .catch(err => showError(err.message));
+  }
+
+  runNextStep();
+})();
+</script>
+</body>
+</html>

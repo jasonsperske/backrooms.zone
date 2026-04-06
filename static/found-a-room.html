@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backrooms Zone -- Found a Room</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: #c0c0c0;
+      color: #000000;
+      font-family: "Arial", "Helvetica", sans-serif;
+      font-size: 13px;
+    }
+
+    /* ---- title bar ---- */
+    #titlebar {
+      background: #000080;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 10px;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    #titlebar .btns { display: flex; gap: 3px; }
+    #titlebar .btn {
+      width: 16px; height: 14px;
+      background: #c0c0c0;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+      font-size: 8px; color: #000;
+      display: flex; align-items: center; justify-content: center;
+      cursor: default; font-family: "Arial", sans-serif; font-weight: bold;
+    }
+
+    /* ---- menu bar ---- */
+    #menubar {
+      background: #c0c0c0;
+      border-bottom: 1px solid #808080;
+      padding: 2px 4px;
+      font-size: 12px;
+      display: flex;
+      position: relative;
+      z-index: 100;
+    }
+    .menu-item { position: relative; }
+    .menu-item > .menu-label {
+      display: block; padding: 2px 8px;
+      cursor: default; white-space: nowrap; user-select: none;
+    }
+    .menu-item > .menu-label u { text-decoration: underline; }
+    .menu-item > .menu-label:hover,
+    .menu-item.open > .menu-label { background: #000080; color: #fff; }
+    .menu-dropdown {
+      display: none; position: absolute; top: 100%; left: 0;
+      min-width: 180px; background: #c0c0c0;
+      border-top: 2px solid #ffffff; border-left: 2px solid #ffffff;
+      border-right: 2px solid #404040; border-bottom: 2px solid #404040;
+      box-shadow: 2px 2px 0 #000; z-index: 200; padding: 2px 0;
+    }
+    .menu-item.open > .menu-dropdown { display: block; }
+    .menu-dropdown .entry {
+      display: flex; align-items: center;
+      padding: 3px 20px 3px 24px;
+      cursor: default; white-space: nowrap; font-size: 12px;
+      color: #000; user-select: none;
+    }
+    .menu-dropdown .entry:hover { background: #000080; color: #fff; }
+    .menu-dropdown .entry.disabled { color: #808080; }
+    .menu-dropdown .entry.disabled:hover { background: transparent; color: #808080; }
+    .menu-dropdown .entry .shortcut {
+      margin-left: auto; padding-left: 24px; opacity: 0.7; font-size: 11px;
+    }
+    .menu-dropdown .entry a { color: inherit; text-decoration: none; display: contents; }
+    .menu-sep { border: none; border-top: 1px solid #808080; border-bottom: 1px solid #fff; margin: 3px 2px; }
+
+    /* ---- address bar ---- */
+    #addressbar {
+      background: #c0c0c0; border-bottom: 2px solid #808080;
+      padding: 3px 6px; display: flex; align-items: center; gap: 6px; font-size: 12px;
+    }
+    #addressbar label { white-space: nowrap; }
+    #addressbar input {
+      flex: 1; background: #ffffff;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 1px 4px; font-size: 12px; font-family: "Arial", sans-serif; outline: none;
+    }
+
+    /* ---- marquee ---- */
+    .marquee-wrap {
+      background: #000080; color: #ffff00;
+      font-family: "VT323", monospace; font-size: 16px; padding: 3px 0; overflow: hidden;
+    }
+
+    /* ---- dialog window ---- */
+    #window {
+      margin: 14px auto; max-width: 520px;
+      border-top: 2px solid #ffffff; border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080; border-bottom: 2px solid #808080;
+    }
+
+    /* dialog title bar */
+    #dialog-titlebar {
+      background: #000080; color: #fff;
+      font-family: "Press Start 2P", monospace; font-size: 9px;
+      padding: 4px 6px; display: flex; align-items: center;
+      justify-content: space-between; user-select: none;
+    }
+    #dialog-titlebar .btn {
+      width: 16px; height: 14px; background: #c0c0c0;
+      border-top: 2px solid #fff; border-left: 2px solid #fff;
+      border-right: 2px solid #808080; border-bottom: 2px solid #808080;
+      font-size: 8px; color: #000;
+      display: flex; align-items: center; justify-content: center;
+      cursor: default; font-weight: bold;
+    }
+
+    #dialog-body {
+      background: #c0c0c0; padding: 16px;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+    }
+
+    /* ---- form elements ---- */
+    .field { margin-bottom: 12px; }
+
+    .field label {
+      display: block; font-size: 12px; margin-bottom: 3px;
+      font-family: "Arial", sans-serif;
+    }
+    .field label u { text-decoration: underline; }
+
+    .field input[type="text"],
+    .field input[type="url"],
+    .field textarea,
+    .field select {
+      width: 100%;
+      background: #ffffff;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 3px 5px;
+      font-size: 13px; font-family: "Arial", sans-serif;
+      outline: none;
+      color: #000;
+    }
+    .field textarea { resize: vertical; min-height: 60px; }
+    .field select { cursor: default; }
+
+    .field input[type="text"]:focus,
+    .field input[type="url"]:focus,
+    .field textarea:focus,
+    .field select:focus {
+      outline: 1px dotted #000;
+    }
+
+    /* radio group */
+    .radio-group {
+      background: #c0c0c0;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 8px 10px;
+    }
+    .radio-group legend {
+      font-size: 11px; padding: 0 4px;
+      font-family: "Press Start 2P", monospace; font-size: 7px;
+      color: #000080; letter-spacing: 0.1em;
+    }
+    .radio-row {
+      display: flex; flex-wrap: wrap; gap: 6px 18px;
+      margin-top: 6px;
+    }
+    .radio-row label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; cursor: default; user-select: none;
+    }
+    .radio-row input[type="radio"] { cursor: default; accent-color: #000080; }
+
+    /* owner field (read-only inset) */
+    .owner-box {
+      background: #c0c0c0;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 6px 8px; margin-bottom: 14px;
+      font-family: "VT323", monospace; font-size: 16px;
+    }
+    .owner-box .label {
+      font-family: "Press Start 2P", monospace; font-size: 7px;
+      color: #000080; text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 3px;
+    }
+    .owner-box .value { word-break: break-all; }
+
+    /* ---- buttons row ---- */
+    .btn-row {
+      display: flex; justify-content: flex-end; gap: 8px;
+      margin-top: 16px;
+    }
+    .win-btn {
+      font-family: "Arial", sans-serif; font-size: 12px;
+      background: #c0c0c0; color: #000;
+      border-top: 2px solid #ffffff; border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080; border-bottom: 2px solid #808080;
+      padding: 4px 20px; min-width: 80px;
+      cursor: default; outline: none;
+    }
+    .win-btn:active {
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 5px 19px 3px 21px;
+    }
+    .win-btn.default {
+      border: 2px solid #000;
+      box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
+    }
+    .win-btn:focus { outline: 1px dotted #000; outline-offset: -4px; }
+
+    /* ---- result panel ---- */
+    #result {
+      display: none; margin-top: 12px;
+      padding: 8px 10px; font-size: 13px;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      font-family: "VT323", monospace; font-size: 17px;
+    }
+    #result.ok  { color: #006400; }
+    #result.err { color: #8b0000; }
+
+    /* ---- status bar ---- */
+    #statusbar {
+      background: #c0c0c0; border-top: 2px solid #808080;
+      padding: 2px 8px; font-size: 11px; display: flex; gap: 4px;
+    }
+    #statusbar .cell {
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 1px 8px;
+    }
+    #statusbar .cell.wide { flex: 1; }
+
+    a          { color: #0000ee; }
+    a:visited  { color: #551a8b; }
+  </style>
+</head>
+<body>
+
+<!-- title bar -->
+<div id="titlebar">
+  <span>&#x1F5A5; Backrooms Zone -- Found a Room -- Netscape Navigator</span>
+  <span class="btns">
+    <span class="btn">_</span>
+    <span class="btn">&#9633;</span>
+    <span class="btn">&#x2715;</span>
+  </span>
+</div>
+
+<!-- menu bar -->
+<div id="menubar">
+  <div class="menu-item">
+    <span class="menu-label"><u>F</u>ile</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">New Window <span class="shortcut">Ctrl+N</span></div>
+      <div class="entry disabled">Open Location... <span class="shortcut">Ctrl+L</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Print... <span class="shortcut">Ctrl+P</span></div>
+      <hr class="menu-sep" />
+      <div class="entry"><a href="/">Back to Registry</a></div>
+      <div class="entry disabled">Close <span class="shortcut">Ctrl+W</span></div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>E</u>dit</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Undo <span class="shortcut">Ctrl+Z</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Cut <span class="shortcut">Ctrl+X</span></div>
+      <div class="entry disabled">Copy <span class="shortcut">Ctrl+C</span></div>
+      <div class="entry disabled">Paste <span class="shortcut">Ctrl+V</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Select All <span class="shortcut">Ctrl+A</span></div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>V</u>iew</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Reload <span class="shortcut">Ctrl+R</span></div>
+      <div class="entry disabled">Stop <span class="shortcut">Esc</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">&#10003;&nbsp; Toolbar</div>
+      <div class="entry disabled">&#10003;&nbsp; Status Bar</div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>G</u>o</span>
+    <div class="menu-dropdown">
+      <div class="entry"><a href="/">Home</a></div>
+      <div class="entry disabled">Back <span class="shortcut">Alt+&#8592;</span></div>
+      <div class="entry disabled">Forward <span class="shortcut">Alt+&#8594;</span></div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>R</u>ooms</span>
+    <div class="menu-dropdown">
+      <div class="entry"><a href="/found-a-room.html">Found a Room...</a></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">My Rooms</div>
+      <div class="entry disabled">Browse All Rooms</div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>H</u>elp</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Help Contents</div>
+      <div class="entry disabled">Release Notes</div>
+      <hr class="menu-sep" />
+      <div class="entry"><a href="https://github.com/jasonsperske/backrooms.zone" target="_blank">About Backrooms Zone...</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- address bar -->
+<div id="addressbar">
+  <label>Location:</label>
+  <input type="text" value="http://backrooms.zone/found-a-room.html" readonly />
+</div>
+
+<!-- marquee -->
+<div class="marquee-wrap">
+  <marquee behavior="scroll" direction="left" scrollamount="3">
+    &nbsp;&nbsp;&nbsp;FOUND A ROOM? REGISTER IT HERE AND HELP OTHERS WANDER DEEPER.&nbsp;&nbsp;&nbsp;
+    All submissions are reviewed. Spam will be removed.&nbsp;&nbsp;&nbsp;
+    *** YOUR TOKEN IS YOUR IDENTITY. KEEP IT SAFE. ***&nbsp;&nbsp;&nbsp;
+  </marquee>
+</div>
+
+<!-- dialog window -->
+<div id="window">
+
+  <div id="dialog-titlebar">
+    <span>Add Room to Registry</span>
+    <span class="btn">&#x2715;</span>
+  </div>
+
+  <div id="dialog-body">
+
+    <div class="owner-box">
+      <div class="label">Registering As (Explorer Token)</div>
+      <div class="value" id="token-display">loading...</div>
+    </div>
+
+    <form id="room-form" onsubmit="submitRoom(event)">
+
+      <div class="field">
+        <label for="f-url"><u>U</u>RL of the Room: <span style="color:#8b0000">*</span></label>
+        <input type="url" id="f-url" name="url" placeholder="https://example.com/level-0" required />
+      </div>
+
+      <div class="field">
+        <label for="f-name"><u>N</u>ame:</label>
+        <input type="text" id="f-name" name="name" placeholder="e.g. The Poolrooms" maxlength="120" />
+      </div>
+
+      <div class="field">
+        <label for="f-desc"><u>D</u>escription:</label>
+        <textarea id="f-desc" name="description" placeholder="Describe what wanderers will find here..." maxlength="400"></textarea>
+      </div>
+
+      <div class="field">
+        <fieldset class="radio-group">
+          <legend>ROOM TYPE</legend>
+          <div class="radio-row">
+            <label><input type="radio" name="room_type" value="liminal" checked /> Liminal</label>
+            <label><input type="radio" name="room_type" value="exploration" /> Exploration</label>
+            <label><input type="radio" name="room_type" value="puzzle" /> Puzzle</label>
+            <label><input type="radio" name="room_type" value="horror" /> Horror</label>
+            <label><input type="radio" name="room_type" value="ambient" /> Ambient</label>
+            <label><input type="radio" name="room_type" value="other" /> Other</label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div id="result"></div>
+
+      <div class="btn-row">
+        <button type="button" class="win-btn" onclick="window.location.href='/'">Cancel</button>
+        <button type="submit" class="win-btn default" id="submit-btn">OK</button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- status bar -->
+<div id="statusbar">
+  <div class="cell wide" id="status-msg">Document: Done</div>
+  <div class="cell" id="status-token">&nbsp;</div>
+</div>
+
+<script>
+  (function () {
+    const KEY = "bz_token";
+
+    function generateToken() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
+
+    let token = localStorage.getItem(KEY);
+    if (!token) {
+      token = generateToken();
+      localStorage.setItem(KEY, token);
+    }
+    document.getElementById("token-display").textContent = token;
+    document.getElementById("status-token").textContent  = "ID: " + token.slice(0, 8) + "...";
+
+    window.submitRoom = function (e) {
+      e.preventDefault();
+      const btn    = document.getElementById("submit-btn");
+      const result = document.getElementById("result");
+      const status = document.getElementById("status-msg");
+
+      const url         = document.getElementById("f-url").value.trim();
+      const name        = document.getElementById("f-name").value.trim() || null;
+      const description = document.getElementById("f-desc").value.trim() || null;
+      const room_type   = document.querySelector("input[name='room_type']:checked").value;
+
+      btn.disabled = true;
+      result.style.display = "none";
+      status.textContent = "Submitting...";
+
+      fetch("/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, url, name, description, room_type }),
+      })
+        .then(async r => {
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.detail || "Submission failed.");
+          result.className = "ok";
+          result.textContent = "Room registered! It has been added to the wandering network.";
+          result.style.display = "block";
+          document.getElementById("room-form").reset();
+          document.getElementById("token-display").textContent = token; // restore after reset
+          status.textContent = "Room registered successfully.";
+        })
+        .catch(err => {
+          result.className = "err";
+          result.textContent = "Error: " + err.message;
+          result.style.display = "block";
+          status.textContent = "Error submitting room.";
+        })
+        .finally(() => { btn.disabled = false; });
+    };
+
+    // ---- dropdown menus ----
+    const items = Array.from(document.querySelectorAll(".menu-item"));
+    function closeAll() { items.forEach(i => i.classList.remove("open")); }
+    items.forEach(item => {
+      item.querySelector(".menu-label").addEventListener("mousedown", e => {
+        e.preventDefault();
+        const wasOpen = item.classList.contains("open");
+        closeAll();
+        if (!wasOpen) item.classList.add("open");
+      });
+      item.querySelector(".menu-label").addEventListener("mouseenter", () => {
+        if (items.some(i => i.classList.contains("open"))) {
+          closeAll();
+          item.classList.add("open");
+        }
+      });
+      item.querySelectorAll(".entry.disabled").forEach(en => {
+        en.addEventListener("mousedown", e => e.preventDefault());
+        en.addEventListener("click",     e => e.stopPropagation());
+      });
+      item.querySelectorAll(".entry:not(.disabled)").forEach(en => {
+        en.addEventListener("click", () => closeAll());
+      });
+    });
+    document.addEventListener("mousedown", e => {
+      if (!e.target.closest(".menu-item")) closeAll();
+    });
+  })();
+</script>
+</body>
+</html>

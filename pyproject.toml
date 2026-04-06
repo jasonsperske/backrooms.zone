@@ -1,0 +1,16 @@
+[project]
+name = "backrooms-zone"
+version = "0.1.0"
+description = "Door registry API for Backrooms Zone games"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+serve = "uvicorn main:app --reload"
+
+[dependency-groups]
+dev = []

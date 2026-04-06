@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: backrooms-zone
+    runtime: python
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: REGISTER_KEY
+        generateValue: true
+      - key: DB_PATH
+        value: /opt/render/project/src/backrooms.db
+    disk:
+      name: data
+      mountPath: /opt/render/project/src
+      sizeGB: 1
