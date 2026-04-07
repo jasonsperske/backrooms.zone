@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Backrooms Zone -- Manage Doors</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: #c0c0c0;
+      color: #000000;
+      font-family: "Arial", "Helvetica", sans-serif;
+      font-size: 13px;
+    }
+
+    /* ---- title bar ---- */
+    #titlebar {
+      background: #000080;
+      color: #ffffff;
+      font-family: "Press Start 2P", monospace;
+      font-size: 10px;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    #titlebar .btns { display: flex; gap: 3px; }
+    #titlebar .btn {
+      width: 16px; height: 14px;
+      background: #c0c0c0;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+      font-size: 8px; color: #000;
+      display: flex; align-items: center; justify-content: center;
+      cursor: default; font-family: "Arial", sans-serif; font-weight: bold;
+    }
+
+    /* ---- menu bar ---- */
+    #menubar {
+      background: #c0c0c0;
+      border-bottom: 1px solid #808080;
+      padding: 2px 4px;
+      font-size: 12px;
+      display: flex;
+      position: relative;
+      z-index: 100;
+    }
+    .menu-item { position: relative; }
+    .menu-item > .menu-label {
+      display: block; padding: 2px 8px;
+      cursor: default; white-space: nowrap; user-select: none;
+    }
+    .menu-item > .menu-label u { text-decoration: underline; }
+    .menu-item > .menu-label:hover,
+    .menu-item.open > .menu-label { background: #000080; color: #fff; }
+    .menu-dropdown {
+      display: none; position: absolute; top: 100%; left: 0;
+      min-width: 180px; background: #c0c0c0;
+      border-top: 2px solid #ffffff; border-left: 2px solid #ffffff;
+      border-right: 2px solid #404040; border-bottom: 2px solid #404040;
+      box-shadow: 2px 2px 0 #000; z-index: 200; padding: 2px 0;
+    }
+    .menu-item.open > .menu-dropdown { display: block; }
+    .menu-dropdown .entry {
+      display: flex; align-items: center;
+      padding: 3px 20px 3px 24px;
+      cursor: default; white-space: nowrap; font-size: 12px;
+      color: #000; user-select: none;
+    }
+    .menu-dropdown .entry:hover { background: #000080; color: #fff; }
+    .menu-dropdown .entry.disabled { color: #808080; }
+    .menu-dropdown .entry.disabled:hover { background: transparent; color: #808080; }
+    .menu-dropdown .entry a { color: inherit; text-decoration: none; display: contents; }
+    .menu-sep { border: none; border-top: 1px solid #808080; border-bottom: 1px solid #fff; margin: 3px 2px; }
+
+    /* ---- address bar ---- */
+    #addressbar {
+      background: #c0c0c0; border-bottom: 2px solid #808080;
+      padding: 3px 6px; display: flex; align-items: center; gap: 6px; font-size: 12px;
+    }
+    #addressbar label { white-space: nowrap; }
+    #addressbar input {
+      flex: 1; background: #ffffff;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 1px 4px; font-size: 12px; font-family: "Arial", sans-serif; outline: none;
+    }
+
+    /* ---- marquee ---- */
+    .marquee-wrap {
+      background: #000080; color: #ffff00;
+      font-family: "VT323", monospace; font-size: 16px; padding: 3px 0; overflow: hidden;
+    }
+
+    /* ---- layout ---- */
+    #layout {
+      display: flex;
+      gap: 0;
+      margin: 10px;
+      align-items: flex-start;
+    }
+
+    /* ---- rooms panel ---- */
+    #rooms-panel {
+      width: 220px;
+      flex-shrink: 0;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+      margin-right: 10px;
+    }
+    #rooms-panel .panel-title {
+      background: #000080; color: #fff;
+      font-family: "Press Start 2P", monospace; font-size: 8px;
+      padding: 4px 8px; letter-spacing: 0.08em;
+    }
+    #rooms-panel .panel-body {
+      background: #ffffff;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      min-height: 160px;
+      padding: 4px 0;
+    }
+    .room-item {
+      padding: 4px 8px;
+      cursor: default;
+      user-select: none;
+      font-size: 12px;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .room-item:hover { background: #000080; color: #fff; }
+    .room-item.selected { background: #000080; color: #fff; }
+    .room-item .room-name {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 1px;
+    }
+    .room-item .room-url {
+      font-size: 10px;
+      opacity: 0.7;
+      display: block;
+    }
+    #rooms-empty {
+      padding: 8px; color: #808080; font-size: 12px; font-style: italic;
+    }
+
+    /* ---- doors panel ---- */
+    #doors-panel {
+      flex: 1;
+      border-top: 2px solid #ffffff;
+      border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080;
+      border-bottom: 2px solid #808080;
+    }
+    #doors-panel .panel-title {
+      background: #000080; color: #fff;
+      font-family: "Press Start 2P", monospace; font-size: 8px;
+      padding: 4px 8px; letter-spacing: 0.08em;
+    }
+    #doors-panel .panel-body {
+      background: #c0c0c0;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 12px;
+    }
+    #no-room-msg {
+      color: #808080; font-style: italic; font-size: 12px;
+    }
+
+    /* ---- door list ---- */
+    .door-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 6px 8px;
+      margin-bottom: 4px;
+      background: #ffffff;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+    }
+    .door-row .door-info { flex: 1; }
+    .door-row .door-id {
+      font-family: "Press Start 2P", monospace; font-size: 7px;
+      color: #000080; white-space: nowrap; margin-bottom: 3px;
+    }
+    .door-row .door-label { font-weight: bold; font-size: 13px; }
+    .door-row .door-dest {
+      font-size: 11px; color: #444; word-break: break-all; margin-top: 2px;
+    }
+    .door-row .door-dest.none { color: #808080; font-style: italic; }
+    .door-row .door-actions { display: flex; flex-direction: column; gap: 4px; }
+
+    /* ---- add door form ---- */
+    #add-door-section {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 2px solid #808080;
+      border-bottom: 1px solid #ffffff;
+    }
+    #add-door-section h3 {
+      font-family: "Press Start 2P", monospace; font-size: 8px;
+      color: #000080; margin-bottom: 10px; letter-spacing: 0.08em;
+    }
+
+    /* ---- form elements ---- */
+    .field { margin-bottom: 8px; }
+    .field label {
+      display: block; font-size: 12px; margin-bottom: 2px;
+    }
+    .field input[type="text"],
+    .field input[type="url"] {
+      width: 100%;
+      background: #ffffff;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 3px 5px;
+      font-size: 13px; font-family: "Arial", sans-serif;
+      outline: none; color: #000;
+    }
+    .field input:focus { outline: 1px dotted #000; }
+
+    /* ---- buttons ---- */
+    .win-btn {
+      font-family: "Arial", sans-serif; font-size: 11px;
+      background: #c0c0c0; color: #000;
+      border-top: 2px solid #ffffff; border-left: 2px solid #ffffff;
+      border-right: 2px solid #808080; border-bottom: 2px solid #808080;
+      padding: 3px 10px;
+      cursor: default; outline: none; white-space: nowrap;
+    }
+    .win-btn:active {
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 4px 9px 2px 11px;
+    }
+    .win-btn:focus { outline: 1px dotted #000; outline-offset: -4px; }
+    .win-btn.danger { color: #8b0000; }
+    .win-btn:disabled { color: #808080; }
+
+    .btn-row { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+
+    /* ---- owner box ---- */
+    .owner-box {
+      background: #c0c0c0;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 6px 8px; margin-bottom: 10px;
+      font-family: "VT323", monospace; font-size: 15px;
+    }
+    .owner-box .label {
+      font-family: "Press Start 2P", monospace; font-size: 7px;
+      color: #000080; text-transform: uppercase; letter-spacing: 0.1em;
+      margin-bottom: 2px;
+    }
+    .owner-box .value { word-break: break-all; }
+
+    /* ---- result ---- */
+    .result-msg {
+      font-family: "VT323", monospace; font-size: 16px;
+      padding: 4px 6px; margin-top: 6px;
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+    }
+    .result-msg.ok  { color: #006400; }
+    .result-msg.err { color: #8b0000; }
+
+    /* ---- status bar ---- */
+    #statusbar {
+      background: #c0c0c0; border-top: 2px solid #808080;
+      padding: 2px 8px; font-size: 11px; display: flex; gap: 4px;
+    }
+    #statusbar .cell {
+      border-top: 2px solid #808080; border-left: 2px solid #808080;
+      border-right: 2px solid #ffffff; border-bottom: 2px solid #ffffff;
+      padding: 1px 8px;
+    }
+    #statusbar .cell.wide { flex: 1; }
+
+    /* ---- code hint ---- */
+    .code-hint {
+      font-family: "VT323", monospace; font-size: 15px;
+      background: #000; color: #00ff00;
+      padding: 4px 8px; margin-top: 4px;
+      border: 1px solid #008000;
+      word-break: break-all;
+    }
+
+    a { color: #0000ee; }
+    a:visited { color: #551a8b; }
+  </style>
+</head>
+<body>
+
+<!-- title bar -->
+<div id="titlebar">
+  <span>&#x1F5A5; Backrooms Zone -- Manage Room Doors -- Netscape Navigator</span>
+  <span class="btns">
+    <span class="btn">_</span>
+    <span class="btn">&#9633;</span>
+    <span class="btn">&#x2715;</span>
+  </span>
+</div>
+
+<!-- menu bar -->
+<div id="menubar">
+  <div class="menu-item">
+    <span class="menu-label"><u>F</u>ile</span>
+    <div class="menu-dropdown">
+      <div class="entry"><a href="/">Home</a></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Close <span style="margin-left:auto;padding-left:24px;font-size:11px">Ctrl+W</span></div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>R</u>ooms</span>
+    <div class="menu-dropdown">
+      <div class="entry"><a href="/found-a-room.html">Found a Room...</a></div>
+      <div class="entry"><a href="/manage-doors.html">Manage Doors...</a></div>
+    </div>
+  </div>
+  <div class="menu-item">
+    <span class="menu-label"><u>H</u>elp</span>
+    <div class="menu-dropdown">
+      <div class="entry"><a href="https://github.com/jasonsperske/backrooms.zone" target="_blank">About Backrooms Zone...</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- address bar -->
+<div id="addressbar">
+  <label>Location:</label>
+  <input type="text" value="http://backrooms.zone/manage-doors.html" readonly />
+</div>
+
+<!-- marquee -->
+<div class="marquee-wrap">
+  <marquee behavior="scroll" direction="left" scrollamount="3">
+    &nbsp;&nbsp;&nbsp;MANAGE YOUR ROOM DOORS &mdash; EACH DOOR IS A PORTAL TO ANOTHER REALM.&nbsp;&nbsp;&nbsp;
+    USE THE DOOR ID IN YOUR GAME ENGINE TO TRIGGER CORRECT TRANSITIONS.&nbsp;&nbsp;&nbsp;
+  </marquee>
+</div>
+
+<!-- main layout -->
+<div id="layout">
+
+  <!-- rooms list -->
+  <div id="rooms-panel">
+    <div class="panel-title">YOUR ROOMS</div>
+    <div class="panel-body" id="rooms-list">
+      <div id="rooms-empty">Loading...</div>
+    </div>
+  </div>
+
+  <!-- doors panel -->
+  <div id="doors-panel">
+    <div class="panel-title" id="doors-panel-title">DOORS</div>
+    <div class="panel-body">
+
+      <div class="owner-box">
+        <div class="label">Explorer Token</div>
+        <div class="value" id="token-display">loading...</div>
+      </div>
+
+      <div id="no-room-msg">Select a room on the left to manage its doors.</div>
+
+      <div id="doors-content" style="display:none">
+
+        <div id="selected-room-info" style="margin-bottom:10px">
+          <span style="font-family:'Press Start 2P',monospace;font-size:7px;color:#000080">ROOM: </span>
+          <span id="selected-room-url" style="font-size:12px;word-break:break-all"></span>
+        </div>
+
+        <div id="door-list"></div>
+        <div id="door-list-empty" style="color:#808080;font-style:italic;font-size:12px;display:none">
+          No doors defined for this room yet.
+        </div>
+
+        <div id="add-door-section">
+          <h3>ADD A DOOR</h3>
+          <form id="add-door-form" onsubmit="addDoor(event)">
+            <div class="field">
+              <label for="f-game-door-id">Game Door ID <span style="color:#8b0000">*</span> <span style="font-size:10px;color:#444">(your engine's identifier, e.g. "door-west-0-7")</span>:</label>
+              <input type="text" id="f-game-door-id" maxlength="120" placeholder="door-west-0-7" required />
+            </div>
+            <div class="field">
+              <label for="f-label">Label <span style="font-size:10px;color:#444">(optional, for your reference)</span>:</label>
+              <input type="text" id="f-label" maxlength="80" placeholder="North Exit" />
+            </div>
+            <div class="field">
+              <label for="f-dest">Destination URL:</label>
+              <input type="url" id="f-dest" placeholder="https://example.com/level-1" />
+            </div>
+            <div id="add-result"></div>
+            <div class="btn-row">
+              <button type="submit" class="win-btn" id="add-btn">Add Door</button>
+            </div>
+          </form>
+        </div>
+
+        <div style="margin-top:12px;border-top:2px solid #808080;border-bottom:1px solid #fff;padding-top:10px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#000080;margin-bottom:8px">BULK IMPORT (JSON)</div>
+          <p style="font-size:12px;line-height:1.6;margin-bottom:6px">
+            Paste a JSON array of door objects. Each object maps to a door entry:
+          </p>
+          <div class="code-hint" style="margin-bottom:8px;white-space:pre">[
+  { "game_door_id": "door-west-0-7", "label": "West Exit", "dest_url": "https://..." },
+  { "game_door_id": "door-east-0-3" }
+]</div>
+          <div class="field">
+            <textarea id="f-import-json" rows="6" style="width:100%;background:#fff;border-top:2px solid #808080;border-left:2px solid #808080;border-right:2px solid #fff;border-bottom:2px solid #fff;padding:4px;font-family:monospace;font-size:12px;resize:vertical;outline:none" placeholder='[{"game_door_id":"..."}]'></textarea>
+          </div>
+          <div id="import-result"></div>
+          <div class="btn-row">
+            <button type="button" class="win-btn" id="import-btn" onclick="importDoors()">Import</button>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;border-top:2px solid #808080;border-bottom:1px solid #fff;padding-top:10px">
+          <div style="font-family:'Press Start 2P',monospace;font-size:7px;color:#000080;margin-bottom:6px">HOW TO USE IN YOUR GAME</div>
+          <p style="font-size:12px;line-height:1.6;margin-bottom:6px">
+            When the player collides with a door, redirect them to:<br/>
+          </p>
+          <div class="code-hint" id="usage-hint">/door?source=YOUR_ROOM_URL&amp;door=DOOR_ID&amp;x=...&amp;y=...&amp;z=...</div>
+          <p style="font-size:11px;color:#444;margin-top:6px;line-height:1.6">
+            The destination game receives <code>?bz_door=DOOR_ID</code> and optional
+            <code>bz_x/y/z</code> return-position coordinates.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- status bar -->
+<div id="statusbar">
+  <div class="cell wide" id="status-msg">Document: Done</div>
+  <div class="cell" id="status-token">&nbsp;</div>
+</div>
+
+<script>
+(function () {
+  const KEY = "bz_token";
+
+  function generateToken() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  }
+
+  let token = localStorage.getItem(KEY);
+  if (!token) { token = generateToken(); localStorage.setItem(KEY, token); }
+  document.getElementById("token-display").textContent = token;
+  document.getElementById("status-token").textContent  = "ID: " + token.slice(0, 8) + "...";
+
+  let selectedRoom = null;
+
+  // ---- load rooms ----
+  function loadRooms() {
+    const list  = document.getElementById("rooms-list");
+    const empty = document.getElementById("rooms-empty");
+    empty.textContent = "Loading...";
+
+    fetch("/doors?token=" + encodeURIComponent(token))
+      .then(r => r.json())
+      .then(rooms => {
+        list.innerHTML = "";
+        if (rooms.length === 0) {
+          const msg = document.createElement("div");
+          msg.id = "rooms-empty";
+          msg.textContent = "No rooms registered yet.";
+          list.appendChild(msg);
+          return;
+        }
+        rooms.forEach(room => {
+          const el = document.createElement("div");
+          el.className = "room-item";
+          el.innerHTML =
+            "<span class='room-name'>" + escHtml(room.name || "(unnamed)") + "</span>" +
+            "<span class='room-url'>" + escHtml(room.url) + "</span>";
+          el.addEventListener("click", () => selectRoom(room, el));
+          list.appendChild(el);
+        });
+        document.getElementById("status-msg").textContent = rooms.length + " room(s) loaded.";
+      })
+      .catch(() => {
+        list.innerHTML = "<div id='rooms-empty' style='color:#8b0000'>Failed to load rooms.</div>";
+      });
+  }
+
+  // ---- select a room ----
+  function selectRoom(room, el) {
+    document.querySelectorAll(".room-item").forEach(i => i.classList.remove("selected"));
+    el.classList.add("selected");
+    selectedRoom = room;
+
+    document.getElementById("no-room-msg").style.display    = "none";
+    document.getElementById("doors-content").style.display  = "block";
+    document.getElementById("selected-room-url").textContent = room.url;
+    document.getElementById("doors-panel-title").textContent = "DOORS \u2014 " + (room.name || room.url);
+    document.getElementById("usage-hint").textContent =
+      "/door?source=" + encodeURIComponent(room.url) + "&door=DOOR_ID&x=...&y=...&z=...";
+
+    loadDoors(room.url);
+  }
+
+  // ---- load doors for a room ----
+  function loadDoors(roomUrl) {
+    const list  = document.getElementById("door-list");
+    const empty = document.getElementById("door-list-empty");
+    list.innerHTML = "";
+    empty.style.display = "none";
+    document.getElementById("status-msg").textContent = "Loading doors...";
+
+    fetch("/rooms/doors?room_url=" + encodeURIComponent(roomUrl))
+      .then(r => r.json())
+      .then(doors => {
+        if (doors.length === 0) {
+          empty.style.display = "block";
+        } else {
+          doors.forEach(door => renderDoorRow(door, list));
+        }
+        document.getElementById("status-msg").textContent = doors.length + " door(s).";
+      })
+      .catch(() => {
+        document.getElementById("status-msg").textContent = "Error loading doors.";
+      });
+  }
+
+  // ---- render a door row ----
+  function renderDoorRow(door, container) {
+    const row = document.createElement("div");
+    row.className = "door-row";
+    row.id = "door-row-" + door.id;
+
+    const destHtml = door.dest_url
+      ? "<span class='door-dest'>" + escHtml(door.dest_url) + "</span>"
+      : "<span class='door-dest none'>(no destination set)</span>";
+
+    row.innerHTML =
+      "<div class='door-info'>" +
+        "<div class='door-id'>DOOR #" + door.id + " &mdash; <span style='font-family:monospace;font-size:9px'>" + escHtml(door.game_door_id || "") + "</span></div>" +
+        "<div class='door-label'>" + escHtml(door.label || "(unlabeled)") + "</div>" +
+        destHtml +
+      "</div>" +
+      "<div class='door-actions'>" +
+        "<button class='win-btn' onclick='editDoor(" + door.id + ")'>Edit</button>" +
+        "<button class='win-btn danger' onclick='deleteDoor(" + door.id + ")'>Delete</button>" +
+      "</div>";
+
+    container.appendChild(row);
+  }
+
+  // ---- add door ----
+  window.addDoor = function (e) {
+    e.preventDefault();
+    if (!selectedRoom) return;
+    const btn        = document.getElementById("add-btn");
+    const result     = document.getElementById("add-result");
+    const gameDoorId = document.getElementById("f-game-door-id").value.trim();
+    const label      = document.getElementById("f-label").value.trim() || null;
+    const destUrl    = document.getElementById("f-dest").value.trim() || null;
+
+    if (!gameDoorId) {
+      result.className = "result-msg err";
+      result.textContent = "Game Door ID is required.";
+      result.style.display = "block";
+      return;
+    }
+
+    btn.disabled = true;
+    result.style.display = "none";
+    document.getElementById("status-msg").textContent = "Adding door...";
+
+    fetch("/rooms/doors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, room_url: selectedRoom.url, game_door_id: gameDoorId, label, dest_url: destUrl }),
+    })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || "Failed.");
+        return data;
+      })
+      .then(door => {
+        document.getElementById("add-door-form").reset();
+        const list  = document.getElementById("door-list");
+        const empty = document.getElementById("door-list-empty");
+        empty.style.display = "none";
+        renderDoorRow(door, list);
+
+        result.className = "result-msg ok";
+        result.textContent = "Door #" + door.id + " (" + door.game_door_id + ") added.";
+        result.style.display = "block";
+        document.getElementById("status-msg").textContent = "Door added.";
+      })
+      .catch(err => {
+        result.className = "result-msg err";
+        result.textContent = "Error: " + err.message;
+        result.style.display = "block";
+        document.getElementById("status-msg").textContent = "Error adding door.";
+      })
+      .finally(() => { btn.disabled = false; });
+  };
+
+  // ---- edit door (inline) ----
+  window.editDoor = function (doorId) {
+    const row = document.getElementById("door-row-" + doorId);
+    if (!row) return;
+
+    const info = row.querySelector(".door-info");
+    // parse current values from the rendered row
+    const idSpan        = row.querySelector(".door-id span");
+    const currentGameId = idSpan ? idSpan.textContent : "";
+    const currentLabel  = row.querySelector(".door-label").textContent;
+    const currentDestEl = row.querySelector(".door-dest:not(.none)");
+    const currentDest   = currentDestEl ? currentDestEl.textContent : "";
+
+    info.innerHTML =
+      "<div class='door-id'>DOOR #" + doorId + "</div>" +
+      "<div class='field' style='margin-bottom:4px'>" +
+        "<label style='font-size:11px'>Game Door ID:</label>" +
+        "<input type='text' id='edit-gameid-" + doorId + "' value='" + escAttr(currentGameId) + "' style='width:100%' />" +
+      "</div>" +
+      "<div class='field' style='margin-bottom:4px'>" +
+        "<label style='font-size:11px'>Label:</label>" +
+        "<input type='text' id='edit-label-" + doorId + "' value='" + escAttr(currentLabel === "(unlabeled)" ? "" : currentLabel) + "' style='width:100%' />" +
+      "</div>" +
+      "<div class='field'>" +
+        "<label style='font-size:11px'>Destination URL:</label>" +
+        "<input type='url' id='edit-dest-" + doorId + "' value='" + escAttr(currentDest) + "' style='width:100%' />" +
+      "</div>";
+
+    const actions = row.querySelector(".door-actions");
+    actions.innerHTML =
+      "<button class='win-btn' onclick='saveDoor(" + doorId + ")'>Save</button>" +
+      "<button class='win-btn' onclick='cancelEdit(" + doorId + ")'>Cancel</button>";
+  };
+
+  window.saveDoor = function (doorId) {
+    const gameDoorId = document.getElementById("edit-gameid-" + doorId).value.trim() || null;
+    const label      = document.getElementById("edit-label-" + doorId).value.trim() || null;
+    const destUrl    = document.getElementById("edit-dest-" + doorId).value.trim() || null;
+
+    document.getElementById("status-msg").textContent = "Saving...";
+
+    fetch("/rooms/doors/" + doorId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, game_door_id: gameDoorId, label, dest_url: destUrl }),
+    })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || "Failed.");
+        return data;
+      })
+      .then(() => {
+        loadDoors(selectedRoom.url);
+        document.getElementById("status-msg").textContent = "Door saved.";
+      })
+      .catch(err => {
+        alert("Error: " + err.message);
+        document.getElementById("status-msg").textContent = "Error saving door.";
+      });
+  };
+
+  window.cancelEdit = function (doorId) {
+    loadDoors(selectedRoom.url);
+  };
+
+  // ---- delete door ----
+  window.deleteDoor = function (doorId) {
+    if (!confirm("Delete door #" + doorId + "? This cannot be undone.")) return;
+    document.getElementById("status-msg").textContent = "Deleting door...";
+
+    fetch("/rooms/doors/" + doorId + "?token=" + encodeURIComponent(token), {
+      method: "DELETE",
+    })
+      .then(async r => {
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.detail || "Failed.");
+        return data;
+      })
+      .then(() => {
+        const row = document.getElementById("door-row-" + doorId);
+        if (row) row.remove();
+        const list = document.getElementById("door-list");
+        if (!list.querySelector(".door-row")) {
+          document.getElementById("door-list-empty").style.display = "block";
+        }
+        document.getElementById("status-msg").textContent = "Door deleted.";
+      })
+      .catch(err => {
+        alert("Error: " + err.message);
+        document.getElementById("status-msg").textContent = "Error deleting door.";
+      });
+  };
+
+  // ---- bulk import ----
+  window.importDoors = async function () {
+    if (!selectedRoom) return;
+    const btn    = document.getElementById("import-btn");
+    const result = document.getElementById("import-result");
+    const raw    = document.getElementById("f-import-json").value.trim();
+
+    result.style.display = "none";
+
+    let doors;
+    try {
+      doors = JSON.parse(raw);
+      if (!Array.isArray(doors)) throw new Error("Expected a JSON array.");
+    } catch (err) {
+      result.className = "result-msg err";
+      result.textContent = "JSON parse error: " + err.message;
+      result.style.display = "block";
+      return;
+    }
+
+    if (doors.length === 0) {
+      result.className = "result-msg err";
+      result.textContent = "Array is empty.";
+      result.style.display = "block";
+      return;
+    }
+
+    btn.disabled = true;
+    document.getElementById("status-msg").textContent = "Importing " + doors.length + " door(s)...";
+
+    let ok = 0, skipped = 0, errors = [];
+
+    for (const d of doors) {
+      if (!d.game_door_id) {
+        errors.push("Skipped entry missing game_door_id: " + JSON.stringify(d));
+        skipped++;
+        continue;
+      }
+      try {
+        const r = await fetch("/rooms/doors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            token,
+            room_url:     selectedRoom.url,
+            game_door_id: String(d.game_door_id),
+            label:        d.label    ? String(d.label)    : null,
+            dest_url:     d.dest_url ? String(d.dest_url) : null,
+          }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          errors.push(d.game_door_id + ": " + (data.detail || "failed"));
+          skipped++;
+        } else {
+          ok++;
+        }
+      } catch (e) {
+        errors.push(d.game_door_id + ": network error");
+        skipped++;
+      }
+    }
+
+    btn.disabled = false;
+    loadDoors(selectedRoom.url);
+    document.getElementById("f-import-json").value = "";
+
+    let msg = ok + " door(s) imported.";
+    if (skipped) msg += " " + skipped + " skipped.";
+    if (errors.length) msg += "\n" + errors.join("\n");
+
+    result.className = errors.length ? "result-msg err" : "result-msg ok";
+    result.style.whiteSpace = "pre-wrap";
+    result.textContent = msg;
+    result.style.display = "block";
+    document.getElementById("status-msg").textContent = msg.split("\n")[0];
+  };
+
+  // ---- helpers ----
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function escAttr(s) {
+    return String(s).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+  }
+
+  // ---- dropdown menus ----
+  const items = Array.from(document.querySelectorAll(".menu-item"));
+  function closeAll() { items.forEach(i => i.classList.remove("open")); }
+  items.forEach(item => {
+    item.querySelector(".menu-label").addEventListener("mousedown", e => {
+      e.preventDefault();
+      const wasOpen = item.classList.contains("open");
+      closeAll();
+      if (!wasOpen) item.classList.add("open");
+    });
+    item.querySelector(".menu-label").addEventListener("mouseenter", () => {
+      if (items.some(i => i.classList.contains("open"))) {
+        closeAll(); item.classList.add("open");
+      }
+    });
+    item.querySelectorAll(".entry.disabled").forEach(en => {
+      en.addEventListener("mousedown", e => e.preventDefault());
+      en.addEventListener("click",     e => e.stopPropagation());
+    });
+    item.querySelectorAll(".entry:not(.disabled)").forEach(en => {
+      en.addEventListener("click", () => closeAll());
+    });
+  });
+  document.addEventListener("mousedown", e => {
+    if (!e.target.closest(".menu-item")) closeAll();
+  });
+
+  loadRooms();
+})();
+</script>
+</body>
+</html>

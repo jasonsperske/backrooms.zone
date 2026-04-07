@@ -388,8 +388,8 @@
     <span class="menu-label"><u>R</u>ooms</span>
     <div class="menu-dropdown">
       <div class="entry"><a href="/found-a-room.html">Found a Room...</a></div>
+      <div class="entry"><a href="/manage-doors.html">Manage Doors...</a></div>
       <hr class="menu-sep" />
-      <div class="entry disabled">My Rooms</div>
       <div class="entry disabled">Browse All Rooms</div>
     </div>
   </div>
@@ -460,7 +460,7 @@
 
     <div class="center">
       <p class="small">You are visitor number</p>
-      <div class="counter" id="visit-counter">0000000</div>
+      <div class="counter" id="visit-counter">0000000000</div>
       <br /><br />
       <p class="small">
         &copy; 1996&ndash;<span id="yr">1996</span> Backrooms Zone &mdash;
@@ -504,7 +504,7 @@
     // ---- visit counter (local vanity) ----
     let visits = parseInt(localStorage.getItem(VISIT_KEY) || "0", 10) + 1;
     localStorage.setItem(VISIT_KEY, visits);
-    document.getElementById("visit-counter").textContent = String(visits).padStart(7, "0");
+    document.getElementById("visit-counter").textContent = String(visits).padStart(10, "0");
     document.getElementById("yr").textContent = new Date().getFullYear();
 
     // ---- door button ----
