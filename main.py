@@ -246,37 +246,95 @@ def door_resolve(body: DoorResolveRequest):
                 "SELECT dest_url FROM room_doors WHERE room_url = ? AND game_door_id = ?",
                 (body.source, body.door_id),
             ).fetchone()
-            if not door_row or not door_row["dest_url"]:
+            if not door_row:
                 raise HTTPException(
                     status_code=404,
                     detail="Door not found or has no destination configured.",
                 )
-            destination = door_row["dest_url"]
 
-            existing = conn.execute(
-                """SELECT id FROM door_visits
-                   WHERE user_token = ? AND source_url = ? AND door_id = ?""",
-                (body.token, body.source, body.door_id),
-            ).fetchone()
+            configured_dest = door_row["dest_url"]
+            source_base = body.source.split("?")[0].rstrip("/")
+            dest_base = configured_dest.split("?")[0].rstrip("/") if configured_dest else None
+            is_self_referential = not configured_dest or dest_base == source_base
 
-            if existing:
-                conn.execute(
-                    """UPDATE door_visits
-                       SET exit_x=?, exit_y=?, exit_z=?, exit_nx=?, exit_ny=?, exit_nz=?,
-                           exit_rotation=?, visited_at=datetime('now')
-                       WHERE user_token=? AND source_url=? AND door_id=?""",
-                    (body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation,
-                     body.token, body.source, body.door_id),
-                )
+            if is_self_referential:
+                # ---- per-user symlink: random on first visit, sticky thereafter ----
+                existing = conn.execute(
+                    """SELECT destination_url FROM door_visits
+                       WHERE user_token = ? AND source_url = ? AND door_id = ?""",
+                    (body.token, body.source, body.door_id),
+                ).fetchone()
+
+                if existing:
+                    destination = existing["destination_url"]
+                    conn.execute(
+                        """UPDATE door_visits
+                           SET exit_x=?, exit_y=?, exit_z=?, exit_nx=?, exit_ny=?, exit_nz=?,
+                               exit_rotation=?, visited_at=datetime('now')
+                           WHERE user_token=? AND source_url=? AND door_id=?""",
+                        (body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation,
+                         body.token, body.source, body.door_id),
+                    )
+                else:
+                    visited = conn.execute(
+                        "SELECT destination_url FROM door_visits WHERE user_token = ?",
+                        (body.token,),
+                    ).fetchall()
+                    visited_urls = {r["destination_url"] for r in visited} | {body.source}
+
+                    candidates = conn.execute(
+                        "SELECT url FROM registered_urls WHERE is_active = 1 AND url NOT IN ({})".format(
+                            ",".join("?" * len(visited_urls))
+                        ),
+                        list(visited_urls),
+                    ).fetchall()
+
+                    if not candidates:
+                        candidates = conn.execute(
+                            "SELECT url FROM registered_urls WHERE is_active = 1 AND url != ?",
+                            (body.source,),
+                        ).fetchall()
+
+                    if not candidates:
+                        raise HTTPException(status_code=503, detail="No registered doors available.")
+
+                    destination = random.choice(candidates)["url"]
+                    conn.execute(
+                        """INSERT INTO door_visits
+                           (user_token, source_url, door_id, destination_url,
+                            exit_x, exit_y, exit_z, exit_nx, exit_ny, exit_nz, exit_rotation)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (body.token, body.source, body.door_id, destination,
+                         body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation),
+                    )
             else:
-                conn.execute(
-                    """INSERT INTO door_visits
-                       (user_token, source_url, door_id, destination_url,
-                        exit_x, exit_y, exit_z, exit_nx, exit_ny, exit_nz, exit_rotation)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (body.token, body.source, body.door_id, destination,
-                     body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation),
-                )
+                # ---- fixed destination configured by room owner ----
+                destination = configured_dest
+
+                existing = conn.execute(
+                    """SELECT id FROM door_visits
+                       WHERE user_token = ? AND source_url = ? AND door_id = ?""",
+                    (body.token, body.source, body.door_id),
+                ).fetchone()
+
+                if existing:
+                    conn.execute(
+                        """UPDATE door_visits
+                           SET exit_x=?, exit_y=?, exit_z=?, exit_nx=?, exit_ny=?, exit_nz=?,
+                               exit_rotation=?, visited_at=datetime('now')
+                           WHERE user_token=? AND source_url=? AND door_id=?""",
+                        (body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation,
+                         body.token, body.source, body.door_id),
+                    )
+                else:
+                    conn.execute(
+                        """INSERT INTO door_visits
+                           (user_token, source_url, door_id, destination_url,
+                            exit_x, exit_y, exit_z, exit_nx, exit_ny, exit_nz, exit_rotation)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (body.token, body.source, body.door_id, destination,
+                         body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation),
+                    )
         else:
             # ---- legacy doorless random resolution ----
             existing = conn.execute(
