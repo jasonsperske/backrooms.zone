@@ -203,7 +203,7 @@
   // ---- read params ----
   const params = new URLSearchParams(window.location.search);
   const source   = params.get("source");
-  const doorId   = params.get("door_id") || null;
+  const doorId   = params.get("door") || params.get("door_id") || null;
 
   if (!source) {
     setProgress(0, "");
