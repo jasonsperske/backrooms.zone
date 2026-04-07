@@ -327,6 +327,15 @@ def door_resolve(body: DoorResolveRequest):
                     (body.token, body.source, destination,
                      body.x, body.y, body.z, body.nx, body.ny, body.nz, body.rotation),
                 )
+                # Create the reverse mapping so the player can walk back through
+                # the door they emerged from and return to this room.
+                # INSERT OR IGNORE preserves any pre-existing mapping for that room.
+                conn.execute(
+                    """INSERT OR IGNORE INTO door_visits
+                       (user_token, source_url, door_id, destination_url)
+                       VALUES (?, ?, NULL, ?)""",
+                    (body.token, destination, body.source),
+                )
 
         # Return the player's most recent exit position from the destination room
         # so the destination game can place them where they last left off.
