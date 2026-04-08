@@ -141,18 +141,38 @@ def _pick_random_dest(token: str, source: str, conn: sqlite3.Connection) -> str:
     return random.choice(candidates)["url"]
 
 
-def _resolve_door_dest(room_url: str, conn: sqlite3.Connection) -> str:
+def _resolve_door_dest(room_url: str, token: str, conn: sqlite3.Connection) -> str:
     """
-    Given a room URL, return a door's dest_url from that room if one exists,
-    otherwise return the room URL itself.
+    Given a room URL, return a door's dest_url that this user hasn't already
+    mapped as an exit from that room (i.e. no existing door_visits row with
+    source_url=room_url for that game_door_id).  Falls back to any door if all
+    are already mapped, or the room URL itself if the room has no doors.
+
+    Filtering out already-mapped doors prevents the reverse INSERT from being
+    silently dropped by INSERT OR IGNORE, which would leave the user unable to
+    walk back to the room they came from.
     """
-    row = conn.execute(
-        """SELECT dest_url FROM room_doors
-           WHERE room_url = ? AND dest_url IS NOT NULL
-           ORDER BY RANDOM() LIMIT 1""",
+    # Doors in this room that already have a mapping for this user
+    used_door_ids = {
+        r["door_id"]
+        for r in conn.execute(
+            """SELECT door_id FROM door_visits
+               WHERE user_token = ? AND source_url = ? AND door_id IS NOT NULL""",
+            (token, room_url),
+        ).fetchall()
+    }
+
+    rows = conn.execute(
+        "SELECT game_door_id, dest_url FROM room_doors WHERE room_url = ? AND dest_url IS NOT NULL",
         (room_url,),
-    ).fetchone()
-    return row["dest_url"] if row else room_url
+    ).fetchall()
+
+    unused = [r for r in rows if r["game_door_id"] not in used_door_ids]
+    candidates = unused if unused else list(rows)
+
+    if candidates:
+        return random.choice(candidates)["dest_url"]
+    return room_url
 
 
 def _store_association(token: str, source: str, door_id: Optional[str],
@@ -254,7 +274,9 @@ def door_resolve(body: DoorResolveRequest):
             destination = _pick_random_dest(body.token, "", conn)
             return {"destination": destination}
 
-        source: str = body.source
+        # Normalize source: strip query string and trailing slash so lookups
+        # are consistent regardless of whether the game appends a trailing slash.
+        source: str = body.source.split("?")[0].rstrip("/")
 
         if body.door_id is not None:
             # ---- door-specific resolution ----
@@ -282,7 +304,7 @@ def door_resolve(body: DoorResolveRequest):
                     destination = existing["destination_url"]
                 else:
                     room_url = _pick_random_dest(body.token, source, conn)
-                    destination = _resolve_door_dest(room_url, conn)
+                    destination = _resolve_door_dest(room_url, body.token, conn)
                     _store_association(body.token, source, body.door_id, destination, conn)
             else:
                 # ---- fixed destination configured by room owner ----
