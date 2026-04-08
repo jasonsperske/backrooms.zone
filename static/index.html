@@ -516,33 +516,9 @@
       btn.classList.add("pressed");
       btn.disabled = true;
       status.className = "";
-      status.textContent = "Checking doors...";
-      msgBar.textContent = "Connecting...";
-
-      fetch("/doors?token=" + encodeURIComponent(token))
-        .then(r => r.json())
-        .then(doors => {
-          if (doors.length === 0) {
-            btn.classList.remove("pressed");
-            btn.disabled = false;
-            status.className = "err";
-            status.textContent = "No doors seem to be open right now.";
-            msgBar.textContent = "Document: Done";
-            alert("No doors seem to be open right now.\n\nCheck back later, wanderer.");
-            return;
-          }
-          status.textContent = "Opening door...";
-          msgBar.textContent = "Loading...";
-          window.location.href = "/door?token=" + encodeURIComponent(token)
-            + "&source=" + encodeURIComponent(SOURCE);
-        })
-        .catch(() => {
-          btn.classList.remove("pressed");
-          btn.disabled = false;
-          status.className = "err";
-          status.textContent = "Error: could not reach the registry.";
-          msgBar.textContent = "Error: connection failed";
-        });
+      status.textContent = "Opening door...";
+      msgBar.textContent = "Loading...";
+      window.location.href = "/go.html?token=" + encodeURIComponent(token);
     };
   })();
 

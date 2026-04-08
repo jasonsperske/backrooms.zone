@@ -200,17 +200,6 @@
     bar.style.background = "#8b0000";
   }
 
-  // ---- read params ----
-  const params = new URLSearchParams(window.location.search);
-  const source   = params.get("source");
-  const doorId   = params.get("door") || params.get("door_id") || null;
-
-  if (!source) {
-    setProgress(0, "");
-    showError("No source URL provided. Is this link from a registered game?");
-    return;
-  }
-
   // ---- token ----
   function generateToken() {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -221,6 +210,12 @@
   }
   let token = localStorage.getItem(TOKEN_KEY);
   if (!token) { token = generateToken(); localStorage.setItem(TOKEN_KEY, token); }
+
+  // ---- read params ----
+  const params  = new URLSearchParams(window.location.search);
+  const source  = params.get("source") || null;
+  const doorId  = params.get("door") || params.get("door_id") || null;
+
   sbTok.textContent = "ID: " + token.slice(0, 8) + "...";
 
   // ---- animate through steps, then resolve ----
@@ -245,10 +240,6 @@
       x:        parseFloat(params.get("x"))        || null,
       y:        parseFloat(params.get("y"))        || null,
       z:        parseFloat(params.get("z"))        || null,
-      nx:       parseFloat(params.get("nx"))       || null,
-      ny:       parseFloat(params.get("ny"))       || null,
-      nz:       parseFloat(params.get("nz"))       || null,
-      rotation: parseFloat(params.get("rotation")) || null,
     };
 
     fetch("/door/resolve", {
@@ -265,28 +256,8 @@
         setProgress(90, "Opening portal...");
         setTimeout(() => {
           setProgress(100, "Stepping through...");
-
-          let dest = data.destination;
-
-          // Append params for the destination game:
-          // bz_door = which door the player came through (so the game knows the spawn point)
-          // bz_x/y/z = player's last known exit from that room (return-trip position)
-          const sp = new URLSearchParams();
-          if (doorId !== null) sp.set("bz_door", doorId);
-          if (data.return_position) {
-            const p = data.return_position;
-            sp.set("bz_x",        p.x);
-            sp.set("bz_y",        p.y);
-            sp.set("bz_z",        p.z);
-            sp.set("bz_nx",       p.nx);
-            sp.set("bz_ny",       p.ny);
-            sp.set("bz_nz",       p.nz);
-            if (p.rotation != null) sp.set("bz_rotation", p.rotation);
-          }
-          const qs = sp.toString();
-          if (qs) dest += (dest.includes("?") ? "&" : "?") + qs;
-
-          setTimeout(() => { window.location.href = dest; }, 300);
+console.log("Redirecting to:", data);
+          setTimeout(() => { window.location.href = data.destination; }, 300);
         }, 350);
       })
       .catch(err => showError(err.message));
