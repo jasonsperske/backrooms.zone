@@ -555,6 +555,7 @@
       "</div>" +
       "<div class='door-actions'>" +
         "<button class='win-btn' onclick='editDoor(" + door.id + ")'>Edit</button>" +
+        "<button class='win-btn' onclick='copyDoorUrl(" + JSON.stringify(door.game_door_id || "") + ")'>Copy URL</button>" +
         "<button class='win-btn danger' onclick='deleteDoor(" + door.id + ")'>Delete</button>" +
       "</div>";
 
@@ -676,6 +677,14 @@
 
   window.cancelEdit = function (doorId) {
     loadDoors(selectedRoom.url);
+  };
+
+  // ---- copy door URL ----
+  window.copyDoorUrl = function (gameDoorId) {
+    const url = location.origin + "/door?source=" + encodeURIComponent(selectedRoom.url) + "&door=" + encodeURIComponent(gameDoorId);
+    navigator.clipboard.writeText(url).then(function () {
+      document.getElementById("status-msg").textContent = "Copied: " + url;
+    });
   };
 
   // ---- delete door ----
