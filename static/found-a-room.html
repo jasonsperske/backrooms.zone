@@ -263,19 +263,24 @@
 
 <!-- menu bar -->
 <div id="menubar">
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="file">
     <span class="menu-label"><u>F</u>ile</span>
     <div class="menu-dropdown">
       <div class="entry disabled">New Window <span class="shortcut">Ctrl+N</span></div>
       <div class="entry disabled">Open Location... <span class="shortcut">Ctrl+L</span></div>
+      <div class="entry disabled">Open File... <span class="shortcut">Ctrl+O</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Save Page As... <span class="shortcut">Ctrl+S</span></div>
+      <div class="entry disabled">Send Page...</div>
       <hr class="menu-sep" />
       <div class="entry disabled">Print... <span class="shortcut">Ctrl+P</span></div>
       <hr class="menu-sep" />
-      <div class="entry"><a href="/">Back to Registry</a></div>
       <div class="entry disabled">Close <span class="shortcut">Ctrl+W</span></div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="edit">
     <span class="menu-label"><u>E</u>dit</span>
     <div class="menu-dropdown">
       <div class="entry disabled">Undo <span class="shortcut">Ctrl+Z</span></div>
@@ -285,9 +290,13 @@
       <div class="entry disabled">Paste <span class="shortcut">Ctrl+V</span></div>
       <hr class="menu-sep" />
       <div class="entry disabled">Select All <span class="shortcut">Ctrl+A</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Find in Page... <span class="shortcut">Ctrl+F</span></div>
+      <div class="entry disabled">Find Again <span class="shortcut">Ctrl+G</span></div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="view">
     <span class="menu-label"><u>V</u>iew</span>
     <div class="menu-dropdown">
       <div class="entry disabled">Reload <span class="shortcut">Ctrl+R</span></div>
@@ -295,17 +304,25 @@
       <hr class="menu-sep" />
       <div class="entry disabled">&#10003;&nbsp; Toolbar</div>
       <div class="entry disabled">&#10003;&nbsp; Status Bar</div>
+      <div class="entry disabled">&#10003;&nbsp; Location Bar</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Page Source <span class="shortcut">Ctrl+U</span></div>
+      <div class="entry disabled">Page Info <span class="shortcut">Ctrl+I</span></div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="go">
     <span class="menu-label"><u>G</u>o</span>
     <div class="menu-dropdown">
-      <div class="entry"><a href="/">Home</a></div>
       <div class="entry disabled">Back <span class="shortcut">Alt+&#8592;</span></div>
       <div class="entry disabled">Forward <span class="shortcut">Alt+&#8594;</span></div>
+      <div class="entry disabled">Home</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Search the Web...</div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="rooms">
     <span class="menu-label"><u>R</u>ooms</span>
     <div class="menu-dropdown">
       <div class="entry"><a href="/found-a-room.html">Found a Room...</a></div>
@@ -314,15 +331,18 @@
       <div class="entry disabled">Browse All Rooms</div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="help">
     <span class="menu-label"><u>H</u>elp</span>
     <div class="menu-dropdown">
       <div class="entry disabled">Help Contents</div>
       <div class="entry disabled">Release Notes</div>
+      <div class="entry disabled">How to Get Support</div>
       <hr class="menu-sep" />
       <div class="entry"><a href="https://github.com/jasonsperske/backrooms.zone" target="_blank">About Backrooms Zone...</a></div>
     </div>
   </div>
+
 </div>
 
 <!-- address bar -->
@@ -432,7 +452,7 @@
       const url         = document.getElementById("f-url").value.trim();
       const name        = document.getElementById("f-name").value.trim() || null;
       const description = document.getElementById("f-desc").value.trim() || null;
-      const room_type   = document.querySelector("input[name='room_type']:checked").value;
+      const classification = document.querySelector("input[name='room_type']:checked").value;
 
       btn.disabled = true;
       result.style.display = "none";
@@ -441,7 +461,7 @@
       fetch("/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, url, name, description, room_type }),
+        body: JSON.stringify({ token, url, name, description, classification }),
       })
         .then(async r => {
           const data = await r.json();
@@ -463,32 +483,35 @@
     };
 
     // ---- dropdown menus ----
-    const items = Array.from(document.querySelectorAll(".menu-item"));
-    function closeAll() { items.forEach(i => i.classList.remove("open")); }
-    items.forEach(item => {
-      item.querySelector(".menu-label").addEventListener("mousedown", e => {
-        e.preventDefault();
-        const wasOpen = item.classList.contains("open");
-        closeAll();
-        if (!wasOpen) item.classList.add("open");
-      });
-      item.querySelector(".menu-label").addEventListener("mouseenter", () => {
-        if (items.some(i => i.classList.contains("open"))) {
+    (function () {
+      const items = Array.from(document.querySelectorAll(".menu-item"));
+      function closeAll() { items.forEach(i => i.classList.remove("open")); }
+      items.forEach(item => {
+        const label = item.querySelector(".menu-label");
+        label.addEventListener("mousedown", e => {
+          e.preventDefault();
+          const wasOpen = item.classList.contains("open");
           closeAll();
-          item.classList.add("open");
-        }
+          if (!wasOpen) item.classList.add("open");
+        });
+        label.addEventListener("mouseenter", () => {
+          if (items.some(i => i.classList.contains("open"))) {
+            closeAll();
+            item.classList.add("open");
+          }
+        });
+        item.querySelectorAll(".entry.disabled").forEach(entry => {
+          entry.addEventListener("mousedown", e => e.preventDefault());
+          entry.addEventListener("click",     e => e.stopPropagation());
+        });
+        item.querySelectorAll(".entry:not(.disabled)").forEach(entry => {
+          entry.addEventListener("click", () => closeAll());
+        });
       });
-      item.querySelectorAll(".entry.disabled").forEach(en => {
-        en.addEventListener("mousedown", e => e.preventDefault());
-        en.addEventListener("click",     e => e.stopPropagation());
+      document.addEventListener("mousedown", e => {
+        if (!e.target.closest(".menu-item")) closeAll();
       });
-      item.querySelectorAll(".entry:not(.disabled)").forEach(en => {
-        en.addEventListener("click", () => closeAll());
-      });
-    });
-    document.addEventListener("mousedown", e => {
-      if (!e.target.closest(".menu-item")) closeAll();
-    });
+    })();
   })();
 </script>
 </body>

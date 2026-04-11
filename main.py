@@ -8,7 +8,6 @@ import sqlite3
 import random
 import os
 from contextlib import contextmanager
-from urllib.parse import urlparse, parse_qs
 
 app = FastAPI(title="Backrooms Zone Door API", docs_url="/api/docs")
 
@@ -24,7 +23,7 @@ REGISTER_KEY = os.environ.get("REGISTER_KEY", "changeme")
 
 
 # ---------------------------------------------------------------------------
-# Database helpers
+# Database
 # ---------------------------------------------------------------------------
 
 @contextmanager
@@ -47,55 +46,56 @@ def init_db():
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            CREATE TABLE IF NOT EXISTS registered_urls (
+            CREATE TABLE IF NOT EXISTS rooms (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                url            TEXT UNIQUE NOT NULL,
+                name           TEXT,
+                description    TEXT,
+                classification TEXT,
+                owner_token    TEXT REFERENCES users(token),
+                created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+                times_entered  INTEGER NOT NULL DEFAULT 0,
+                times_exited   INTEGER NOT NULL DEFAULT 0,
+                is_featured    INTEGER NOT NULL DEFAULT 0,
+                is_active      INTEGER NOT NULL DEFAULT 1
+            );
+
+            CREATE TABLE IF NOT EXISTS doors (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 url           TEXT UNIQUE NOT NULL,
-                name          TEXT,
-                description   TEXT,
-                room_type     TEXT,
-                owner_token   TEXT,
-                registered_at TEXT NOT NULL DEFAULT (datetime('now')),
-                is_active     INTEGER NOT NULL DEFAULT 1
+                room_id       INTEGER NOT NULL REFERENCES rooms(id),
+                game_door_id  TEXT NOT NULL,
+                label         TEXT,
+                dest_url      TEXT,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                times_entered INTEGER NOT NULL DEFAULT 0,
+                times_exited  INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (room_id, game_door_id)
             );
 
-            CREATE TABLE IF NOT EXISTS door_visits (
-                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_token      TEXT NOT NULL,
-                    source_url      TEXT NOT NULL,
-                    door_id         TEXT,
-                    destination_url TEXT NOT NULL,
-                    visited_at      TEXT NOT NULL DEFAULT (datetime('now')),
-                    FOREIGN KEY (user_token) REFERENCES users(token)
-                );
-            CREATE UNIQUE INDEX IF NOT EXISTS uq_dv_door
-                ON door_visits(user_token, source_url, door_id) WHERE door_id IS NOT NULL;
-            CREATE UNIQUE INDEX IF NOT EXISTS uq_dv_nodoor
-                ON door_visits(user_token, source_url) WHERE door_id IS NULL;
-
-            CREATE TABLE IF NOT EXISTS room_doors (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                room_url     TEXT NOT NULL,
-                game_door_id TEXT NOT NULL,
-                label        TEXT,
-                dest_url     TEXT,
-                created_at   TEXT NOT NULL DEFAULT (datetime('now')),
-                UNIQUE (room_url, game_door_id),
-                FOREIGN KEY (room_url) REFERENCES registered_urls(url)
+            CREATE TABLE IF NOT EXISTS collisions (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                exit_door_id     INTEGER REFERENCES doors(id),
+                entrance_door_id INTEGER REFERENCES doors(id),
+                exit_room_id     INTEGER NOT NULL REFERENCES rooms(id),
+                entrance_room_id INTEGER NOT NULL REFERENCES rooms(id),
+                user_token       TEXT NOT NULL REFERENCES users(token),
+                time_collided    TEXT NOT NULL DEFAULT (datetime('now')),
+                times_traversed  INTEGER NOT NULL DEFAULT 1
             );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_collision_door
+                ON collisions(user_token, exit_door_id) WHERE exit_door_id IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_collision_nodoor
+                ON collisions(user_token, exit_room_id) WHERE exit_door_id IS NULL;
         """)
 
 
-def migrate_db():
-    """No-op placeholder for future migrations."""
-    pass
-
-
 init_db()
-migrate_db()
 
 
 # ---------------------------------------------------------------------------
-# Auth helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 def require_register_key(x_api_key: Optional[str] = Header(default=None)):
@@ -104,106 +104,89 @@ def require_register_key(x_api_key: Optional[str] = Header(default=None)):
 
 
 def ensure_user(token: str, conn: sqlite3.Connection):
-    """Create user record if it doesn't exist yet."""
-    conn.execute(
-        "INSERT OR IGNORE INTO users (token) VALUES (?)",
-        (token,),
-    )
+    conn.execute("INSERT OR IGNORE INTO users (token) VALUES (?)", (token,))
 
 
-def _pick_random_dest(token: str, source: str, conn: sqlite3.Connection) -> str:
+def _lookup_door(room_id: int, game_door_id: str, conn: sqlite3.Connection) -> Optional[int]:
+    """Return a door's id if it exists in the registry, otherwise None."""
+    row = conn.execute(
+        "SELECT id FROM doors WHERE room_id = ? AND game_door_id = ?",
+        (room_id, game_door_id),
+    ).fetchone()
+    return row["id"] if row else None
+
+
+def _pick_fresh_destination(
+    token: str,
+    exclude_room_id: int,
+    conn: sqlite3.Connection,
+    max_tries: int = 5,
+) -> tuple:
     """
-    Pick a random unvisited room URL for a first-time door visit.
-    Falls back to any room other than source if all rooms have been visited.
+    Find a destination (entrance_room_id, entrance_door_id, redirect_url) for a new collision.
+
+    Strategy:
+      - Try up to max_tries random rooms; for each, look for a door that this user
+        hasn't collided with yet (not already an entrance_door_id for this user).
+      - If a fresh door is found, return it.
+      - After max_tries with no fresh door, fall back to the already-collided
+        (entrance_room, entrance_door) with the lowest times_traversed.
+      - Last resort: any active room other than the source.
     """
-    visited_rows = conn.execute(
-        "SELECT destination_url FROM door_visits WHERE user_token = ?",
-        (token,),
-    ).fetchall()
-    visited_bases = {r["destination_url"].split("?")[0].rstrip("/") for r in visited_rows}
-    visited_bases.add(source.split("?")[0].rstrip("/"))
-
-    exclude = f"url NOT IN ({','.join('?' * len(visited_bases))})"
-    candidates = conn.execute(
-        f"SELECT url FROM registered_urls WHERE is_active = 1 AND {exclude}",
-        list(visited_bases),
-    ).fetchall()
-
-    if not candidates:
-        candidates = conn.execute(
-            "SELECT url FROM registered_urls WHERE is_active = 1 AND url != ?",
-            (source.split("?")[0].rstrip("/"),),
-        ).fetchall()
-
-    if not candidates:
-        raise HTTPException(status_code=503, detail="No registered rooms available.")
-
-    return random.choice(candidates)["url"]
-
-
-def _resolve_door_dest(room_url: str, token: str, conn: sqlite3.Connection) -> str:
-    """
-    Given a room URL, return a door's dest_url that this user hasn't already
-    mapped as an exit from that room (i.e. no existing door_visits row with
-    source_url=room_url for that game_door_id).  Falls back to any door if all
-    are already mapped, or the room URL itself if the room has no doors.
-
-    Filtering out already-mapped doors prevents the reverse INSERT from being
-    silently dropped by INSERT OR IGNORE, which would leave the user unable to
-    walk back to the room they came from.
-    """
-    # Doors in this room that already have a mapping for this user
-    used_door_ids = {
-        r["door_id"]
+    used_entrance_ids = {
+        r["entrance_door_id"]
         for r in conn.execute(
-            """SELECT door_id FROM door_visits
-               WHERE user_token = ? AND source_url = ? AND door_id IS NOT NULL""",
-            (token, room_url),
+            "SELECT entrance_door_id FROM collisions WHERE user_token = ? AND entrance_door_id IS NOT NULL",
+            (token,),
         ).fetchall()
     }
 
-    rows = conn.execute(
-        "SELECT game_door_id, dest_url FROM room_doors WHERE room_url = ? AND dest_url IS NOT NULL",
-        (room_url,),
-    ).fetchall()
+    tried_ids = {exclude_room_id}
 
-    unused = [r for r in rows if r["game_door_id"] not in used_door_ids]
-    candidates = unused if unused else list(rows)
+    for _ in range(max_tries):
+        ph = ",".join("?" * len(tried_ids))
+        room = conn.execute(
+            f"SELECT id, url FROM rooms WHERE is_active = 1 AND id NOT IN ({ph}) ORDER BY RANDOM() LIMIT 1",
+            list(tried_ids),
+        ).fetchone()
+        if not room:
+            break
+        tried_ids.add(room["id"])
 
-    if candidates:
-        return random.choice(candidates)["dest_url"]
-    return room_url
+        doors = conn.execute(
+            "SELECT id, dest_url FROM doors WHERE room_id = ?", (room["id"],)
+        ).fetchall()
+        fresh = [d for d in doors if d["id"] not in used_entrance_ids]
+        if fresh:
+            chosen = random.choice(fresh)
+            return room["id"], chosen["id"], chosen["dest_url"] or room["url"]
 
+    # Fallback: already-collided entrance with lowest times_traversed
+    row = conn.execute(
+        """SELECT c.entrance_room_id, c.entrance_door_id, d.dest_url, r.url AS room_url
+           FROM collisions c
+           JOIN rooms r ON r.id = c.entrance_room_id
+           LEFT JOIN doors d ON d.id = c.entrance_door_id
+           WHERE c.user_token = ? AND c.entrance_room_id != ?
+           ORDER BY c.times_traversed ASC
+           LIMIT 1""",
+        (token, exclude_room_id),
+    ).fetchone()
+    if row:
+        return row["entrance_room_id"], row["entrance_door_id"], row["dest_url"] or row["room_url"]
 
-def _store_association(token: str, source: str, door_id: Optional[str],
-                       destination: str, conn: sqlite3.Connection):
-    """
-    Store the forward association and its reverse so the player can walk back.
-
-    Forward:  (source, door_id)  → destination
-    Reverse:  (dest_base, dest_door_id) → source
-    """
-    conn.execute(
-        """INSERT OR IGNORE INTO door_visits (user_token, source_url, door_id, destination_url)
-           VALUES (?, ?, ?, ?)""",
-        (token, source, door_id, destination),
-    )
-    # Parse the destination URL to derive the reverse source + door_id
-    parsed = urlparse(destination)
-    dest_base = f"{parsed.scheme}://{parsed.netloc}{parsed.path}".rstrip("/")
-    qs = parse_qs(parsed.query)
-    dest_door_id = next(
-        (qs[k][0] for k in ("bz_door", "door", "door_id") if k in qs), None
-    )
-    conn.execute(
-        """INSERT OR IGNORE INTO door_visits (user_token, source_url, door_id, destination_url)
-           VALUES (?, ?, ?, ?)""",
-        (token, dest_base, dest_door_id, source),
-    )
+    # Last resort: any active room other than source (enter-only, no door)
+    room = conn.execute(
+        "SELECT id, url FROM rooms WHERE is_active = 1 AND id != ? ORDER BY RANDOM() LIMIT 1",
+        (exclude_room_id,),
+    ).fetchone()
+    if not room:
+        raise HTTPException(status_code=503, detail="No rooms available.")
+    return room["id"], None, room["url"]
 
 
 # ---------------------------------------------------------------------------
-# Models
+# Request models
 # ---------------------------------------------------------------------------
 
 class RegisterURLRequest(BaseModel):
@@ -217,13 +200,13 @@ class SubmitRoomRequest(BaseModel):
     url: str
     name: Optional[str] = None
     description: Optional[str] = None
-    room_type: Optional[str] = None
+    classification: Optional[str] = None
 
 
 class DoorResolveRequest(BaseModel):
     token: str
     source: Optional[str] = None
-    door_id: Optional[str] = None
+    game_door_id: Optional[str] = None
 
 
 class RoomDoorRequest(BaseModel):
@@ -247,10 +230,7 @@ class RoomDoorUpdateRequest(BaseModel):
 
 @app.get("/door")
 def door(request: Request):
-    """
-    Browser entry point. Forwards all query params to /go.html so the
-    client-side page can attach the localStorage token before resolving.
-    """
+    """Browser entry point — redirects to go.html with query params intact."""
     qs = request.url.query
     return RedirectResponse(url=f"/go.html?{qs}" if qs else "/go.html", status_code=302)
 
@@ -260,70 +240,79 @@ def door_resolve(body: DoorResolveRequest):
     """
     Resolves a door transition.
 
-    - Stores the player's exit position for this source door (per door_id if provided).
-    - If door_id is given, destination is fixed by the room_doors table.
-    - Otherwise, destination is randomly assigned (existing behaviour).
-    - Returns the player's last-known exit position FROM the destination room
-      so the destination game can place them back where they came from.
+    - Token only (no source/game_door_id): picks a random room, increments its
+      times_entered, and returns its URL. No collision is recorded.
+    - Token + source + game_door_id: looks up the existing collision; if found,
+      increments stats and returns the cached destination. If not, picks a
+      fresh destination room+door, records the collision, and returns it.
     """
     with get_db() as conn:
         ensure_user(body.token, conn)
 
-        if body.source is None:
-            # No source — entry from the portal, just pick a random room.
-            destination = _pick_random_dest(body.token, "", conn)
-            return {"destination": destination}
-
-        # Normalize source: strip query string and trailing slash so lookups
-        # are consistent regardless of whether the game appends a trailing slash.
-        source: str = body.source.split("?")[0].rstrip("/")
-
-        if body.door_id is not None:
-            # ---- door-specific resolution ----
-            # door_id is the game's own string identifier (e.g. "door-west-0-7").
-            # Look it up via game_door_id so room owners can map it to a fixed destination.
-            door_row = conn.execute(
-                "SELECT dest_url FROM room_doors WHERE room_url = ? AND game_door_id = ?",
-                (source, body.door_id),
+        if body.source is None or body.game_door_id is None:
+            room = conn.execute(
+                "SELECT id, url FROM rooms WHERE is_active = 1 ORDER BY RANDOM() LIMIT 1"
             ).fetchone()
+            if not room:
+                raise HTTPException(status_code=503, detail="No rooms available.")
+            conn.execute("UPDATE rooms SET times_entered = times_entered + 1 WHERE id = ?", (room["id"],))
+            return {"destination": room["url"]}
 
-            configured_dest = door_row["dest_url"] if door_row else None
-            source_base = source.split("?")[0].rstrip("/")
-            dest_base = configured_dest.split("?")[0].rstrip("/") if configured_dest else None
-            is_self_referential = not configured_dest or dest_base == source_base
+        source: str = body.source
 
-            if is_self_referential:
-                # ---- per-user symlink: random on first visit, sticky thereafter ----
-                existing = conn.execute(
-                    """SELECT destination_url FROM door_visits
-                       WHERE user_token = ? AND source_url = ? AND door_id = ?""",
-                    (body.token, source, body.door_id),
-                ).fetchone()
+        source_room = conn.execute(
+            "SELECT id FROM rooms WHERE url = ? AND is_active = 1", (source,)
+        ).fetchone()
+        if not source_room:
+            raise HTTPException(status_code=404, detail="Source room not registered.")
+        source_room_id: int = source_room["id"]
 
-                if existing:
-                    destination = existing["destination_url"]
-                else:
-                    room_url = _pick_random_dest(body.token, source, conn)
-                    destination = _resolve_door_dest(room_url, body.token, conn)
-                    _store_association(body.token, source, body.door_id, destination, conn)
-            else:
-                # ---- fixed destination configured by room owner ----
-                assert configured_dest is not None
-                destination = configured_dest
-                _store_association(body.token, source, body.door_id, destination, conn)
+        exit_door_id = _lookup_door(source_room_id, body.game_door_id, conn)
+        if exit_door_id is None:
+            raise HTTPException(status_code=404, detail="Door not registered for this room.")
+
+        existing = conn.execute(
+            """SELECT c.id, c.entrance_room_id, c.entrance_door_id, c.times_traversed,
+                      d.dest_url, r.url AS room_url
+               FROM collisions c
+               JOIN rooms r ON r.id = c.entrance_room_id
+               LEFT JOIN doors d ON d.id = c.entrance_door_id
+               WHERE c.user_token = ? AND c.exit_door_id = ?""",
+            (body.token, exit_door_id),
+        ).fetchone()
+
+        if existing:
+            conn.execute(
+                "UPDATE collisions SET times_traversed = times_traversed + 1 WHERE id = ?",
+                (existing["id"],),
+            )
+            conn.execute("UPDATE rooms SET times_exited  = times_exited  + 1 WHERE id = ?", (source_room_id,))
+            conn.execute("UPDATE rooms SET times_entered = times_entered + 1 WHERE id = ?", (existing["entrance_room_id"],))
+            conn.execute("UPDATE doors SET times_exited  = times_exited  + 1 WHERE id = ?", (exit_door_id,))
+            if existing["entrance_door_id"]:
+                conn.execute("UPDATE doors SET times_entered = times_entered + 1 WHERE id = ?", (existing["entrance_door_id"],))
+            destination = existing["dest_url"] or existing["room_url"]
         else:
-            # ---- doorless random resolution (no door_id provided) ----
-            existing = conn.execute(
-                """SELECT destination_url FROM door_visits
-                   WHERE user_token = ? AND source_url = ? AND door_id IS NULL""",
-                (body.token, source),
-            ).fetchone()
-
-            if existing:
-                destination = existing["destination_url"]
-            else:
-                destination = _pick_random_dest(body.token, source, conn)
-                _store_association(body.token, source, None, destination, conn)
+            dest_room_id, entrance_door_id, destination = _pick_fresh_destination(
+                body.token, source_room_id, conn
+            )
+            conn.execute(
+                """INSERT INTO collisions
+                       (user_token, exit_door_id, entrance_door_id, exit_room_id, entrance_room_id)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (body.token, exit_door_id, entrance_door_id, source_room_id, dest_room_id),
+            )
+            conn.execute(
+                """INSERT OR IGNORE INTO collisions
+                       (user_token, exit_door_id, entrance_door_id, exit_room_id, entrance_room_id)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (body.token, entrance_door_id, exit_door_id, dest_room_id, source_room_id),
+            )
+            conn.execute("UPDATE rooms SET times_exited  = times_exited  + 1 WHERE id = ?", (source_room_id,))
+            conn.execute("UPDATE rooms SET times_entered = times_entered + 1 WHERE id = ?", (dest_room_id,))
+            conn.execute("UPDATE doors SET times_exited  = times_exited  + 1 WHERE id = ?", (exit_door_id,))
+            if entrance_door_id:
+                conn.execute("UPDATE doors SET times_entered = times_entered + 1 WHERE id = ?", (entrance_door_id,))
 
     return {"destination": destination}
 
@@ -331,59 +320,54 @@ def door_resolve(body: DoorResolveRequest):
 @app.post("/rooms", status_code=201)
 def submit_room(body: SubmitRoomRequest):
     """Public endpoint — any player can submit a room using their token as owner."""
-    ALLOWED_TYPES = {"exploration", "puzzle", "horror", "ambient", "liminal", "other"}
-    room_type = body.room_type.lower() if body.room_type else "other"
-    if room_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=422, detail=f"room_type must be one of: {', '.join(sorted(ALLOWED_TYPES))}")
+    ALLOWED = {"exploration", "puzzle", "horror", "ambient", "liminal", "other"}
+    classification = body.classification.lower() if body.classification else "other"
+    if classification not in ALLOWED:
+        raise HTTPException(status_code=422, detail=f"classification must be one of: {', '.join(sorted(ALLOWED))}")
 
     with get_db() as conn:
         ensure_user(body.token, conn)
 
         existing = conn.execute(
-            "SELECT id, is_active FROM registered_urls WHERE url = ?",
-            (body.url,),
+            "SELECT id, is_active FROM rooms WHERE url = ?", (body.url,)
         ).fetchone()
 
         if existing:
             if existing["is_active"]:
                 raise HTTPException(status_code=409, detail="This URL is already registered.")
             conn.execute(
-                """UPDATE registered_urls
-                   SET is_active = 1, name = ?, description = ?, room_type = ?, owner_token = ?
+                """UPDATE rooms SET is_active = 1, name = ?, description = ?, classification = ?, owner_token = ?
                    WHERE url = ?""",
-                (body.name, body.description, room_type, body.token, body.url),
+                (body.name, body.description, classification, body.token, body.url),
             )
             return {"status": "reactivated", "url": body.url}
 
         conn.execute(
-            """INSERT INTO registered_urls (url, name, description, room_type, owner_token)
-               VALUES (?, ?, ?, ?, ?)""",
-            (body.url, body.name, body.description, room_type, body.token),
+            "INSERT INTO rooms (url, name, description, classification, owner_token) VALUES (?, ?, ?, ?, ?)",
+            (body.url, body.name, body.description, classification, body.token),
         )
     return {"status": "registered", "url": body.url}
 
 
 @app.post("/register", dependencies=[Depends(require_register_key)], status_code=201)
 def register_url(body: RegisterURLRequest):
-    """Register a new door URL. Requires X-API-Key header."""
+    """Admin endpoint — register a room by URL. Requires X-API-Key header."""
     with get_db() as conn:
         existing = conn.execute(
-            "SELECT id, is_active FROM registered_urls WHERE url = ?",
-            (body.url,),
+            "SELECT id, is_active FROM rooms WHERE url = ?", (body.url,)
         ).fetchone()
 
         if existing:
             if existing["is_active"]:
                 raise HTTPException(status_code=409, detail="URL already registered and active.")
-            # Re-activate
             conn.execute(
-                "UPDATE registered_urls SET is_active = 1, name = ?, description = ? WHERE url = ?",
+                "UPDATE rooms SET is_active = 1, name = ?, description = ? WHERE url = ?",
                 (body.name, body.description, body.url),
             )
             return {"status": "reactivated", "url": body.url}
 
         conn.execute(
-            "INSERT INTO registered_urls (url, name, description) VALUES (?, ?, ?)",
+            "INSERT INTO rooms (url, name, description) VALUES (?, ?, ?)",
             (body.url, body.name, body.description),
         )
     return {"status": "registered", "url": body.url}
@@ -395,39 +379,58 @@ def deregister_url(
     token: Optional[str] = Query(default=None),
     x_api_key: Optional[str] = Header(default=None),
 ):
-    """
-    Deactivate a registered door URL.
-    Allowed if the caller is the room's owner (matching token) or holds the admin API key.
-    """
+    """Deactivate a room. Caller must be the owner or hold the admin API key."""
     with get_db() as conn:
         row = conn.execute(
-            "SELECT owner_token FROM registered_urls WHERE url = ? AND is_active = 1",
-            (url,),
+            "SELECT owner_token FROM rooms WHERE url = ? AND is_active = 1", (url,)
         ).fetchone()
-
         if not row:
             raise HTTPException(status_code=404, detail="URL not found.")
 
-        is_admin = x_api_key == REGISTER_KEY
-        is_owner = token and token == row["owner_token"]
-
-        if not is_admin and not is_owner:
+        if x_api_key != REGISTER_KEY and (not token or token != row["owner_token"]):
             raise HTTPException(status_code=403, detail="You do not own this room.")
 
-        conn.execute("UPDATE registered_urls SET is_active = 0 WHERE url = ?", (url,))
+        conn.execute("UPDATE rooms SET is_active = 0 WHERE url = ?", (url,))
 
     return {"status": "deactivated", "url": url}
 
 
+@app.post("/rooms/featured")
+def set_featured(url: str = Query(...), x_api_key: Optional[str] = Header(default=None)):
+    """Admin endpoint — mark a room as featured."""
+    if x_api_key != REGISTER_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-API-Key header")
+    with get_db() as conn:
+        result = conn.execute(
+            "UPDATE rooms SET is_featured = 1 WHERE url = ? AND is_active = 1", (url,)
+        )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Room not found.")
+    return {"status": "featured", "url": url}
+
+
+@app.delete("/rooms/featured")
+def unset_featured(url: str = Query(...), x_api_key: Optional[str] = Header(default=None)):
+    """Admin endpoint — remove featured status from a room."""
+    if x_api_key != REGISTER_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-API-Key header")
+    with get_db() as conn:
+        result = conn.execute(
+            "UPDATE rooms SET is_featured = 0 WHERE url = ? AND is_active = 1", (url,)
+        )
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Room not found.")
+    return {"status": "unfeatured", "url": url}
+
+
 @app.get("/doors")
-def list_doors(token: str = Query(...)):
-    """List active registered door URLs owned by the given token."""
+def list_rooms_by_owner(token: str = Query(...)):
+    """List active rooms owned by the given token."""
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT url, name, description, room_type, registered_at
-               FROM registered_urls
-               WHERE is_active = 1 AND owner_token = ?
-               ORDER BY registered_at""",
+            """SELECT url, name, description, classification, created_at,
+                      times_entered, times_exited, is_featured
+               FROM rooms WHERE is_active = 1 AND owner_token = ? ORDER BY created_at""",
             (token,),
         ).fetchall()
     return [dict(r) for r in rows]
@@ -437,10 +440,14 @@ def list_doors(token: str = Query(...)):
 def list_room_doors(room_url: str = Query(...)):
     """List all doors defined for a given room URL."""
     with get_db() as conn:
+        room = conn.execute("SELECT id FROM rooms WHERE url = ?", (room_url,)).fetchone()
+        if not room:
+            raise HTTPException(status_code=404, detail="Room not found.")
         rows = conn.execute(
-            """SELECT id, game_door_id, label, dest_url, created_at
-               FROM room_doors WHERE room_url = ? ORDER BY id""",
-            (room_url,),
+            """SELECT id, url, game_door_id, label, dest_url, created_at,
+                      times_entered, times_exited
+               FROM doors WHERE room_id = ? ORDER BY id""",
+            (room["id"],),
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -450,23 +457,25 @@ def add_room_door(body: RoomDoorRequest):
     """Add a door to a room. Caller must be the room's owner."""
     with get_db() as conn:
         room = conn.execute(
-            "SELECT owner_token FROM registered_urls WHERE url = ? AND is_active = 1",
-            (body.room_url,),
+            "SELECT id, owner_token FROM rooms WHERE url = ? AND is_active = 1", (body.room_url,)
         ).fetchone()
         if not room:
             raise HTTPException(status_code=404, detail="Room not found.")
         if room["owner_token"] != body.token:
             raise HTTPException(status_code=403, detail="You do not own this room.")
 
+        door_url = body.dest_url or f"{body.room_url}?bz_door={body.game_door_id}"
         try:
             cur = conn.execute(
-                "INSERT INTO room_doors (room_url, game_door_id, label, dest_url) VALUES (?, ?, ?, ?)",
-                (body.room_url, body.game_door_id, body.label, body.dest_url),
+                "INSERT INTO doors (url, room_id, game_door_id, label, dest_url) VALUES (?, ?, ?, ?, ?)",
+                (door_url, room["id"], body.game_door_id, body.label, body.dest_url),
             )
         except Exception:
-            raise HTTPException(status_code=409, detail="A door with that Game Door ID already exists for this room.")
+            raise HTTPException(status_code=409, detail="A door with that game_door_id already exists for this room.")
         door_id = cur.lastrowid
-    return {"id": door_id, "game_door_id": body.game_door_id, "room_url": body.room_url, "label": body.label, "dest_url": body.dest_url}
+
+    return {"id": door_id, "url": door_url, "game_door_id": body.game_door_id,
+            "room_url": body.room_url, "label": body.label, "dest_url": body.dest_url}
 
 
 @app.put("/rooms/doors/{door_id}")
@@ -474,10 +483,9 @@ def update_room_door(door_id: int, body: RoomDoorUpdateRequest):
     """Update a door's game_door_id, label, or destination. Caller must own the room."""
     with get_db() as conn:
         door = conn.execute(
-            """SELECT rd.room_url, rd.game_door_id, rd.label, rd.dest_url, ru.owner_token
-               FROM room_doors rd
-               JOIN registered_urls ru ON ru.url = rd.room_url
-               WHERE rd.id = ?""",
+            """SELECT d.game_door_id, d.label, d.dest_url, r.owner_token
+               FROM doors d JOIN rooms r ON r.id = d.room_id
+               WHERE d.id = ?""",
             (door_id,),
         ).fetchone()
         if not door:
@@ -490,7 +498,7 @@ def update_room_door(door_id: int, body: RoomDoorUpdateRequest):
         new_dest_url     = body.dest_url     if body.dest_url     is not None else door["dest_url"]
 
         conn.execute(
-            "UPDATE room_doors SET game_door_id=?, label=?, dest_url=? WHERE id=?",
+            "UPDATE doors SET game_door_id = ?, label = ?, dest_url = ? WHERE id = ?",
             (new_game_door_id, new_label, new_dest_url, door_id),
         )
     return {"id": door_id, "game_door_id": new_game_door_id, "label": new_label, "dest_url": new_dest_url}
@@ -501,10 +509,7 @@ def delete_room_door(door_id: int, token: str = Query(...)):
     """Delete a door. Caller must own the room."""
     with get_db() as conn:
         door = conn.execute(
-            """SELECT rd.room_url, ru.owner_token
-               FROM room_doors rd
-               JOIN registered_urls ru ON ru.url = rd.room_url
-               WHERE rd.id = ?""",
+            "SELECT r.owner_token FROM doors d JOIN rooms r ON r.id = d.room_id WHERE d.id = ?",
             (door_id,),
         ).fetchone()
         if not door:
@@ -512,24 +517,37 @@ def delete_room_door(door_id: int, token: str = Query(...)):
         if door["owner_token"] != token:
             raise HTTPException(status_code=403, detail="You do not own this room.")
 
-        conn.execute("DELETE FROM room_doors WHERE id = ?", (door_id,))
+        conn.execute("DELETE FROM doors WHERE id = ?", (door_id,))
     return {"status": "deleted", "id": door_id}
 
 
 @app.get("/stats/{token}")
 def user_stats(token: str):
-    """Return visit history for a player token."""
+    """Return collision history for a player token."""
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT source_url, door_id, destination_url, visited_at
-               FROM door_visits WHERE user_token = ? ORDER BY visited_at""",
+            """SELECT
+                   c.id,
+                   er.url  AS exit_room_url,
+                   ed.url  AS exit_door_url,
+                   nr.url  AS entrance_room_url,
+                   nd.url  AS entrance_door_url,
+                   c.time_collided,
+                   c.times_traversed
+               FROM collisions c
+               JOIN rooms er ON er.id = c.exit_room_id
+               JOIN rooms nr ON nr.id = c.entrance_room_id
+               LEFT JOIN doors ed ON ed.id = c.exit_door_id
+               LEFT JOIN doors nd ON nd.id = c.entrance_door_id
+               WHERE c.user_token = ?
+               ORDER BY c.time_collided""",
             (token,),
         ).fetchall()
     return [dict(r) for r in rows]
 
 
 # ---------------------------------------------------------------------------
-# Static files (must come last so API routes take priority)
+# Static files (must come last)
 # ---------------------------------------------------------------------------
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

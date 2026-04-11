@@ -310,27 +310,86 @@
 
 <!-- menu bar -->
 <div id="menubar">
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="file">
     <span class="menu-label"><u>F</u>ile</span>
     <div class="menu-dropdown">
-      <div class="entry"><a href="/">Home</a></div>
+      <div class="entry disabled">New Window <span class="shortcut">Ctrl+N</span></div>
+      <div class="entry disabled">Open Location... <span class="shortcut">Ctrl+L</span></div>
+      <div class="entry disabled">Open File... <span class="shortcut">Ctrl+O</span></div>
       <hr class="menu-sep" />
-      <div class="entry disabled">Close <span style="margin-left:auto;padding-left:24px;font-size:11px">Ctrl+W</span></div>
+      <div class="entry disabled">Save Page As... <span class="shortcut">Ctrl+S</span></div>
+      <div class="entry disabled">Send Page...</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Print... <span class="shortcut">Ctrl+P</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Close <span class="shortcut">Ctrl+W</span></div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="edit">
+    <span class="menu-label"><u>E</u>dit</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Undo <span class="shortcut">Ctrl+Z</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Cut <span class="shortcut">Ctrl+X</span></div>
+      <div class="entry disabled">Copy <span class="shortcut">Ctrl+C</span></div>
+      <div class="entry disabled">Paste <span class="shortcut">Ctrl+V</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Select All <span class="shortcut">Ctrl+A</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Find in Page... <span class="shortcut">Ctrl+F</span></div>
+      <div class="entry disabled">Find Again <span class="shortcut">Ctrl+G</span></div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="view">
+    <span class="menu-label"><u>V</u>iew</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Reload <span class="shortcut">Ctrl+R</span></div>
+      <div class="entry disabled">Stop <span class="shortcut">Esc</span></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">&#10003;&nbsp; Toolbar</div>
+      <div class="entry disabled">&#10003;&nbsp; Status Bar</div>
+      <div class="entry disabled">&#10003;&nbsp; Location Bar</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Page Source <span class="shortcut">Ctrl+U</span></div>
+      <div class="entry disabled">Page Info <span class="shortcut">Ctrl+I</span></div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="go">
+    <span class="menu-label"><u>G</u>o</span>
+    <div class="menu-dropdown">
+      <div class="entry disabled">Back <span class="shortcut">Alt+&#8592;</span></div>
+      <div class="entry disabled">Forward <span class="shortcut">Alt+&#8594;</span></div>
+      <div class="entry disabled">Home</div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Search the Web...</div>
+    </div>
+  </div>
+
+  <div class="menu-item" data-menu="rooms">
     <span class="menu-label"><u>R</u>ooms</span>
     <div class="menu-dropdown">
       <div class="entry"><a href="/found-a-room.html">Found a Room...</a></div>
       <div class="entry"><a href="/manage-doors.html">Manage Doors...</a></div>
+      <hr class="menu-sep" />
+      <div class="entry disabled">Browse All Rooms</div>
     </div>
   </div>
-  <div class="menu-item">
+
+  <div class="menu-item" data-menu="help">
     <span class="menu-label"><u>H</u>elp</span>
     <div class="menu-dropdown">
+      <div class="entry disabled">Help Contents</div>
+      <div class="entry disabled">Release Notes</div>
+      <div class="entry disabled">How to Get Support</div>
+      <hr class="menu-sep" />
       <div class="entry"><a href="https://github.com/jasonsperske/backrooms.zone" target="_blank">About Backrooms Zone...</a></div>
     </div>
   </div>
+
 </div>
 
 <!-- address bar -->
@@ -427,10 +486,9 @@
           <p style="font-size:12px;line-height:1.6;margin-bottom:6px">
             When the player collides with a door, redirect them to:<br/>
           </p>
-          <div class="code-hint" id="usage-hint">/door?source=YOUR_ROOM_URL&amp;door=DOOR_ID&amp;x=...&amp;y=...&amp;z=...</div>
+          <div class="code-hint" id="usage-hint">/door?source=YOUR_ROOM_URL&amp;door=DOOR_ID</div>
           <p style="font-size:11px;color:#444;margin-top:6px;line-height:1.6">
-            The destination game receives <code>?bz_door=DOOR_ID</code> and optional
-            <code>bz_x/y/z</code> return-position coordinates.
+            The destination game receives the <code>dest_url</code> configured for the matched entrance door.
           </p>
         </div>
 
@@ -509,7 +567,7 @@
     document.getElementById("selected-room-url").textContent = room.url;
     document.getElementById("doors-panel-title").textContent = "DOORS \u2014 " + (room.name || room.url);
     document.getElementById("usage-hint").textContent =
-      "/door?source=" + encodeURIComponent(room.url) + "&door=DOOR_ID&x=...&y=...&z=...";
+      "/door?source=" + encodeURIComponent(room.url) + "&door=DOOR_ID";
 
     loadDoors(room.url);
   }
@@ -806,31 +864,35 @@
   }
 
   // ---- dropdown menus ----
-  const items = Array.from(document.querySelectorAll(".menu-item"));
-  function closeAll() { items.forEach(i => i.classList.remove("open")); }
-  items.forEach(item => {
-    item.querySelector(".menu-label").addEventListener("mousedown", e => {
-      e.preventDefault();
-      const wasOpen = item.classList.contains("open");
-      closeAll();
-      if (!wasOpen) item.classList.add("open");
+  (function () {
+    const items = Array.from(document.querySelectorAll(".menu-item"));
+    function closeAll() { items.forEach(i => i.classList.remove("open")); }
+    items.forEach(item => {
+      const label = item.querySelector(".menu-label");
+      label.addEventListener("mousedown", e => {
+        e.preventDefault();
+        const wasOpen = item.classList.contains("open");
+        closeAll();
+        if (!wasOpen) item.classList.add("open");
+      });
+      label.addEventListener("mouseenter", () => {
+        if (items.some(i => i.classList.contains("open"))) {
+          closeAll();
+          item.classList.add("open");
+        }
+      });
+      item.querySelectorAll(".entry.disabled").forEach(entry => {
+        entry.addEventListener("mousedown", e => e.preventDefault());
+        entry.addEventListener("click",     e => e.stopPropagation());
+      });
+      item.querySelectorAll(".entry:not(.disabled)").forEach(entry => {
+        entry.addEventListener("click", () => closeAll());
+      });
     });
-    item.querySelector(".menu-label").addEventListener("mouseenter", () => {
-      if (items.some(i => i.classList.contains("open"))) {
-        closeAll(); item.classList.add("open");
-      }
+    document.addEventListener("mousedown", e => {
+      if (!e.target.closest(".menu-item")) closeAll();
     });
-    item.querySelectorAll(".entry.disabled").forEach(en => {
-      en.addEventListener("mousedown", e => e.preventDefault());
-      en.addEventListener("click",     e => e.stopPropagation());
-    });
-    item.querySelectorAll(".entry:not(.disabled)").forEach(en => {
-      en.addEventListener("click", () => closeAll());
-    });
-  });
-  document.addEventListener("mousedown", e => {
-    if (!e.target.closest(".menu-item")) closeAll();
-  });
+  })();
 
   loadRooms();
 })();

@@ -3,201 +3,154 @@
 <head>
   <meta charset="UTF-8" />
   <title>Backrooms Zone -- Opening Door...</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: #000080;
-      color: #c0c0c0;
-      font-family: "VT323", monospace;
-      font-size: 20px;
+      background: #000000;
+      color: #aaaaaa;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 16px;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-    }
-
-    /* ---- title bar ---- */
-    #titlebar {
-      background: #c0c0c0;
-      color: #000;
-      font-family: "Press Start 2P", monospace;
-      font-size: 9px;
-      padding: 3px 6px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      user-select: none;
-      border-bottom: 2px solid #808080;
-    }
-    #titlebar .btns { display: flex; gap: 3px; }
-    #titlebar .btn {
-      width: 16px; height: 14px;
-      background: #c0c0c0;
-      border-top: 2px solid #ffffff;
-      border-left: 2px solid #ffffff;
-      border-right: 2px solid #808080;
-      border-bottom: 2px solid #808080;
-      font-size: 8px; color: #000;
-      display: flex; align-items: center; justify-content: center;
-      cursor: default; font-weight: bold;
-    }
-
-    /* ---- main area ---- */
-    #stage {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       justify-content: center;
-      padding: 40px 20px;
-      text-align: center;
+      align-items: center;
     }
 
-    #stage h1 {
-      font-family: "Press Start 2P", monospace;
-      font-size: 11px;
-      color: #ffff00;
-      letter-spacing: 0.12em;
-      margin-bottom: 28px;
-      line-height: 2;
+    #screen {
+      width: 640px;
+      max-width: 98vw;
+      padding: 0 8px;
     }
 
-    /* progress bar */
-    #bar-outer {
-      width: 340px;
-      max-width: 90vw;
-      height: 26px;
-      background: #000040;
-      border-top: 2px solid #808080;
-      border-left: 2px solid #808080;
-      border-right: 2px solid #ffffff;
-      border-bottom: 2px solid #ffffff;
-      margin-bottom: 20px;
-      overflow: hidden;
+    .box-title {
+      color: #ffffff;
+      white-space: pre;
+      line-height: 1.4;
+      margin-bottom: 16px;
     }
-    #bar-inner {
-      height: 100%;
-      width: 0%;
-      background: repeating-linear-gradient(
-        90deg,
-        #c0c0c0 0px, #c0c0c0 16px,
-        #000080 16px, #000080 18px
-      );
-      transition: width 0.3s linear;
+
+    .section {
+      white-space: pre;
+      line-height: 1.6;
+      margin-bottom: 16px;
     }
+
+    .label  { color: #00aaaa; }
+    .value  { color: #ffffff; }
+    .dim    { color: #555555; }
+    .yellow { color: #ffff55; }
+    .green  { color: #55ff55; }
+    .red    { color: #ff5555; }
 
     #status-line {
-      font-size: 18px;
-      color: #c0c0c0;
-      min-height: 24px;
-      margin-bottom: 10px;
+      color: #ffff55;
+      white-space: pre;
+      min-height: 1.6em;
+      margin-bottom: 4px;
+    }
+
+    #progress-row {
+      white-space: pre;
+      color: #aaaaaa;
+      margin-bottom: 16px;
     }
 
     #error-box {
       display: none;
-      margin-top: 20px;
-      background: #c0c0c0;
-      color: #8b0000;
-      font-family: "Press Start 2P", monospace;
-      font-size: 8px;
-      line-height: 2;
-      padding: 14px 18px;
-      border-top: 2px solid #ffffff;
-      border-left: 2px solid #ffffff;
-      border-right: 2px solid #808080;
-      border-bottom: 2px solid #808080;
-      max-width: 400px;
-      text-align: left;
-    }
-    #error-box .err-title {
-      color: #000080;
-      margin-bottom: 8px;
-    }
-    #error-box a {
-      color: #000080;
+      white-space: pre-wrap;
+      border: 1px solid #ff5555;
+      padding: 8px 12px;
+      margin-top: 8px;
+      color: #ff5555;
+      line-height: 1.6;
     }
 
-    /* ---- status bar ---- */
     #statusbar {
-      background: #c0c0c0;
-      border-top: 2px solid #808080;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #0000aa;
+      color: #ffffff;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 14px;
       padding: 2px 8px;
-      font-size: 13px;
-      color: #000;
       display: flex;
-      gap: 4px;
-      font-family: "Arial", sans-serif;
+      justify-content: space-between;
     }
-    #statusbar .cell {
-      border-top: 2px solid #808080;
-      border-left: 2px solid #808080;
-      border-right: 2px solid #ffffff;
-      border-bottom: 2px solid #ffffff;
-      padding: 1px 8px;
-    }
-    #statusbar .cell.wide { flex: 1; }
   </style>
 </head>
 <body>
 
-<div id="titlebar">
-  <span>&#x1F5A5; Opening Door... -- Backrooms Zone</span>
-  <span class="btns">
-    <span class="btn">_</span>
-    <span class="btn">&#9633;</span>
-    <span class="btn">&#x2715;</span>
-  </span>
-</div>
+<div id="screen">
 
-<div id="stage">
-  <h1>BACKROOMS ZONE<br/>DOOR REGISTRY</h1>
+  <div class="box-title" id="title-box">&#x250C;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2510;
+&#x2502;        BACKROOMS.ZONE  DOOR RESOLUTION SYSTEM  v1.0         &#x2502;
+&#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;</div>
 
-  <div id="bar-outer"><div id="bar-inner"></div></div>
+  <div class="section">
+    <span class="label">EXPLORER TOKEN : </span><span class="value" id="token-display">loading...</span>
+    <span class="label">SOURCE ROOM    : </span><span class="value" id="source-display"><span class="dim">none</span></span>
+    <span class="label">DOOR ID        : </span><span class="value" id="door-display"><span class="dim">none</span></span>
+  </div>
+
+  <div class="section dim">&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;</div>
+
   <div id="status-line">Initializing...</div>
+  <div id="progress-row">[<span id="progress-fill"></span><span id="progress-empty">&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;</span>]  <span id="progress-pct">  0%</span></div>
 
   <div id="error-box">
-    <div class="err-title">ERROR</div>
-    <div id="error-msg">An unknown error occurred.</div>
-    <br/>
-    <a href="/">Return to registry</a>
+    <span class="red">ERROR &#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;</span>
+    <span id="error-msg">An unknown error occurred.</span>
+
+    <a href="/" style="color:#55ffff">Return to registry</a>
   </div>
+
 </div>
 
 <div id="statusbar">
-  <div class="cell wide" id="sb-msg">Connecting to door registry...</div>
-  <div class="cell" id="sb-token">&nbsp;</div>
+  <span id="sb-msg">Connecting to door registry...</span>
+  <span id="sb-token">&nbsp;</span>
 </div>
 
 <script>
 (function () {
-  const TOKEN_KEY = "bz_token";
+  const TOKEN_KEY  = "bz_token";
+  const BAR_WIDTH  = 40;
   const STEPS = [
-    [10,  "Reading explorer token..."],
-    [25,  "Locating door in registry..."],
-    [50,  "Resolving destination..."],
-    [75,  "Calculating return coordinates..."],
-    [90,  "Opening portal..."],
-    [100, "Stepping through..."],
+    [10,  "Reading explorer token...         "],
+    [25,  "Locating door in registry...      "],
+    [50,  "Querying door registry...         "],
+    [75,  "Resolving destination...          "],
+    [90,  "Opening portal...                 "],
+    [100, "Stepping through...               "],
   ];
 
-  const bar    = document.getElementById("bar-inner");
-  const status = document.getElementById("status-line");
-  const sbMsg  = document.getElementById("sb-msg");
-  const sbTok  = document.getElementById("sb-token");
+  const statusEl  = document.getElementById("status-line");
+  const fillEl    = document.getElementById("progress-fill");
+  const emptyEl   = document.getElementById("progress-empty");
+  const pctEl     = document.getElementById("progress-pct");
+  const sbMsg     = document.getElementById("sb-msg");
+  const sbTok     = document.getElementById("sb-token");
 
   function setProgress(pct, msg) {
-    bar.style.width = pct + "%";
-    status.textContent = msg;
-    sbMsg.textContent  = msg;
+    const filled = Math.round((pct / 100) * BAR_WIDTH);
+    const empty  = BAR_WIDTH - filled;
+    fillEl.textContent  = "\u2588".repeat(filled);
+    emptyEl.textContent = "\u2591".repeat(empty);
+    pctEl.textContent   = String(pct).padStart(3) + "%";
+    statusEl.textContent = msg;
+    sbMsg.textContent    = msg.trim();
   }
 
   function showError(msg) {
     document.getElementById("error-box").style.display = "block";
     document.getElementById("error-msg").textContent   = msg;
-    status.textContent = "Error.";
-    sbMsg.textContent  = "Error: " + msg;
-    bar.style.background = "#8b0000";
+    statusEl.textContent = "ERROR: " + msg;
+    fillEl.style.color   = "#ff5555";
+    sbMsg.textContent    = "ERROR: " + msg;
   }
 
   // ---- token ----
@@ -211,12 +164,17 @@
   let token = localStorage.getItem(TOKEN_KEY);
   if (!token) { token = generateToken(); localStorage.setItem(TOKEN_KEY, token); }
 
-  // ---- read params ----
-  const params  = new URLSearchParams(window.location.search);
-  const source  = params.get("source") || null;
-  const doorId  = params.get("door") || params.get("door_id") || null;
+  document.getElementById("token-display").textContent = token;
 
-  sbTok.textContent = "ID: " + token.slice(0, 8) + "...";
+  // ---- read params ----
+  const params = new URLSearchParams(window.location.search);
+  const source = params.get("source") || null;
+  const doorId = params.get("door") || null;
+
+  if (source) document.getElementById("source-display").textContent = source;
+  if (doorId) document.getElementById("door-display").textContent   = doorId;
+
+  sbTok.textContent = "TOKEN: " + token.slice(0, 8) + "...";
 
   // ---- animate through steps, then resolve ----
   let stepIdx = 0;
@@ -231,15 +189,12 @@
   }
 
   function resolve() {
-    setProgress(75, "Resolving destination...");
+    setProgress(75, "Resolving destination...          ");
 
     const body = {
       token,
       source,
-      door_id:  doorId,
-      x:        parseFloat(params.get("x"))        || null,
-      y:        parseFloat(params.get("y"))        || null,
-      z:        parseFloat(params.get("z"))        || null,
+      game_door_id: doorId,
     };
 
     fetch("/door/resolve", {
@@ -253,10 +208,9 @@
         return data;
       })
       .then(data => {
-        setProgress(90, "Opening portal...");
+        setProgress(90, "Opening portal...                 ");
         setTimeout(() => {
-          setProgress(100, "Stepping through...");
-console.log("Redirecting to:", data);
+          setProgress(100, "Stepping through...               ");
           setTimeout(() => { window.location.href = data.destination; }, 300);
         }, 350);
       })
